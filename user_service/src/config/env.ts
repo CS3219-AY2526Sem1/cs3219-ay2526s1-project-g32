@@ -1,6 +1,7 @@
 import { config as loadEnv } from 'dotenv';
 import { z } from 'zod';
 
+// validate and parse environment variables with Zod
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.string().optional(),
@@ -11,14 +12,14 @@ const envSchema = z.object({
   SUPABASE_JWT_SECRET: z.string().min(1, 'SUPABASE_JWT_SECRET is required'),
 });
 
-// Allow loading of a custom .env path via process.env before validation
+// load .env into process.env
 loadEnv();
 
 const parsedEnv = envSchema.safeParse(process.env);
 
 if (!parsedEnv.success) {
   // eslint-disable-next-line no-console
-  console.error('? Invalid environment configuration:\n', parsedEnv.error.flatten().fieldErrors);
+  console.error('Invalid environment configuration', parsedEnv.error.flatten().fieldErrors);
   throw new Error('Environment validation failed');
 }
 
