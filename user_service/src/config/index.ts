@@ -1,3 +1,5 @@
+import { env } from './env';
+
 const parsePort = (value: string | undefined): number => {
   if (!value) return 4001;
   const parsed = Number(value);
@@ -13,10 +15,16 @@ const parseAllowedOrigins = (origins: string | undefined): string[] => {
 };
 
 export const config = {
-  nodeEnv: process.env.NODE_ENV ?? 'development', // set to 'development' for now
-  port: parsePort(process.env.PORT),
+  nodeEnv: env.NODE_ENV,
+  port: parsePort(env.PORT),
   baseApiPath: '/api/v1',
   cors: {
-    allowedOrigins: parseAllowedOrigins(process.env.CORS_ALLOWED_ORIGINS),
+    allowedOrigins: parseAllowedOrigins(env.CORS_ALLOWED_ORIGINS),
+  },
+  supabase: {
+    url: env.SUPABASE_URL,
+    anonKey: env.SUPABASE_ANON_KEY,
+    serviceRoleKey: env.SUPABASE_SERVICE_ROLE_KEY,
+    jwtSecret: env.SUPABASE_JWT_SECRET,
   },
 };
