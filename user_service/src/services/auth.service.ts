@@ -6,8 +6,7 @@ import { supabaseAdminClient, supabaseAnonClient } from './supabaseClient';
 type RegisterInput = {
   email: string;
   password: string;
-  firstName: string;
-  lastName: string;
+  username: string;
   redirectTo?: string;
 };
 
@@ -53,8 +52,7 @@ const handleAuthResponse = (response: AuthResponse, defaultStatus = 400) => {
 export const registerUser = async ({
   email,
   password,
-  firstName,
-  lastName,
+  username,
   redirectTo,
 }: RegisterInput) => {
   const { data, error } = await supabaseAdminClient.auth.admin.createUser({
@@ -62,8 +60,7 @@ export const registerUser = async ({
     password,
     email_confirm: false,
     user_metadata: {
-      firstName,
-      lastName,
+      username
     },
   });
 
