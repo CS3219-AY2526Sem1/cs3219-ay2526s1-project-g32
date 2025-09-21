@@ -25,15 +25,28 @@ type VerifyOtpInput = {
   token: string;
 };
 
-const toPublicUser = (user: User | null) => {
+export type PublicUser = {
+  id: string;
+  email: string | null;
+  emailConfirmed: boolean;
+  createdAt: string;
+  userMetadata: Record<string, unknown>;
+};
+
+const toPublicUser = (user: User | null): PublicUser | null => {
   if (!user) return null;
+
+  const metadata =
+    typeof user.user_metadata === 'object' && user.user_metadata !== null
+      ? (user.user_metadata as Record<string, unknown>)
+      : {};
 
   return {
     id: user.id,
-    email: user.email,
+    email: user.email ?? null,
     emailConfirmed: Boolean(user.email_confirmed_at),
     createdAt: user.created_at,
-    userMetadata: user.user_metadata ?? {},
+    userMetadata: metadata,
   };
 };
 
@@ -60,7 +73,7 @@ export const registerUser = async ({
     password,
     email_confirm: false,
     user_metadata: {
-      username
+      username,
     },
   });
 
@@ -152,4 +165,14 @@ export const verifyOtp = async ({ email, token }: VerifyOtpInput) => {
         }
       : null,
   };
+};
+
+export const getUserById = async (userId: string) => {
+  const { data, error } = await supabaseAdminClient.auth.admin.getUserById(userId);
+
+  if (error) {
+    throw new HttpError(error.status ?? 400, error.message, error);
+  }
+
+  return toPublicUser(data.user);
 };

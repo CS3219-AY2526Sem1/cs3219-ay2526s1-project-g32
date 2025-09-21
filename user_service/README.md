@@ -56,4 +56,6 @@ The service listens on `http://localhost:4001` by default.
 - `POST /api/v1/auth/login`
 - `POST /api/v1/auth/send-otp`
 - `POST /api/v1/auth/verify-otp`
-- `GET /api/v1/profile/me`
+- `GET /api/v1/auth/me`
+
+See controller documentation (to be added) for payload specifics.

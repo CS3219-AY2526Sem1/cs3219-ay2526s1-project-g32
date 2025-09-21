@@ -1,4 +1,7 @@
 node_modules
 .env
 .DS_Store
-dist/
+user_service/dist/
+frontend/.next/
+frontend/out/
+frontend/.env.local
