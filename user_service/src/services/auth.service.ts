@@ -15,14 +15,9 @@ type LoginInput = {
   password: string;
 };
 
-type SendOtpInput = {
+type SendMagicLinkInput = {
   email: string;
   redirectTo?: string;
-};
-
-type VerifyOtpInput = {
-  email: string;
-  token: string;
 };
 
 export type PublicUser = {
@@ -62,6 +57,26 @@ const handleAuthResponse = (response: AuthResponse, defaultStatus = 400) => {
   return response.data;
 };
 
+export const sendMagicLink = async ({ email, redirectTo }: SendMagicLinkInput) => {
+  const response = await supabaseAdminClient.auth.signInWithOtp({
+    email,
+    options: {
+      emailRedirectTo: redirectTo,
+      shouldCreateUser: false,
+    },
+  });
+
+  if (response.error) {
+    throw new HttpError(
+      response.error.status ?? 400,
+      response.error.message,
+      response.error,
+    );
+  }
+
+  return { magicLinkSent: true };
+};
+
 export const registerUser = async ({
   email,
   password,
@@ -81,25 +96,11 @@ export const registerUser = async ({
     throw new HttpError(error.status ?? 400, error.message, error);
   }
 
-  const otpResponse = await supabaseAdminClient.auth.signInWithOtp({
-    email,
-    options: {
-      emailRedirectTo: redirectTo,
-      shouldCreateUser: false,
-    },
-  });
-
-  if (otpResponse.error) {
-    throw new HttpError(
-      otpResponse.error.status ?? 400,
-      otpResponse.error.message,
-      otpResponse.error,
-    );
-  }
+  await sendMagicLink({ email, redirectTo });
 
   return {
     user: toPublicUser(data.user),
-    verificationEmailSent: true,
+    magicLinkSent: true,
   };
 };
 
@@ -121,49 +122,6 @@ export const loginUser = async ({ email, password }: LoginInput) => {
     expiresAt: data.session.expires_at,
     tokenType: data.session.token_type,
     user: toPublicUser(data.user),
-  };
-};
-
-export const sendOtp = async ({ email, redirectTo }: SendOtpInput) => {
-  const response = await supabaseAdminClient.auth.signInWithOtp({
-    email,
-    options: {
-      emailRedirectTo: redirectTo,
-      shouldCreateUser: false,
-    },
-  });
-
-  if (response.error) {
-    throw new HttpError(
-      response.error.status ?? 400,
-      response.error.message,
-      response.error,
-    );
-  }
-
-  return { verificationEmailSent: true };
-};
-
-export const verifyOtp = async ({ email, token }: VerifyOtpInput) => {
-  const response = await supabaseAdminClient.auth.verifyOtp({
-    email,
-    token,
-    type: 'email',
-  });
-
-  const data = handleAuthResponse(response);
-  const session = data.session;
-
-  return {
-    user: toPublicUser(data.user),
-    session: session
-      ? {
-          accessToken: session.access_token,
-          refreshToken: session.refresh_token,
-          expiresAt: session.expires_at,
-          tokenType: session.token_type,
-        }
-      : null,
   };
 };
 

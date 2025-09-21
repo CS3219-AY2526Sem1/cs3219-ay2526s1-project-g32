@@ -5,10 +5,8 @@ const emailField = z.string().email('Valid email required');
 export const registerSchema = {
   body: z.object({
     email: emailField,
-    password: z
-      .string()
-      .min(8, 'Password must be at least 8 characters long'),
-      username: z.string().min(1, 'Username is required'),
+    password: z.string().min(8, 'Password must be at least 8 characters long'),
+    username: z.string().min(1, 'Username is required'),
     redirectTo: z.string().url('redirectTo must be a valid URL').optional(),
   }),
 };
@@ -20,7 +18,7 @@ export const loginSchema = {
   }),
 };
 
-export const sendOtpSchema = {
+export const sendMagicLinkSchema = {
   body: z.object({
     email: emailField,
     redirectTo: z.string().url('redirectTo must be a valid URL').optional(),

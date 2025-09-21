@@ -1,11 +1,10 @@
-import type { NextFunction, Request, Response } from 'express';
+﻿import type { NextFunction, Request, Response } from 'express';
 
 import {
   getUserById,
   loginUser,
   registerUser,
-  sendOtp,
-  verifyOtp,
+  sendMagicLink,
 } from '../services/auth.service';
 import type { AuthenticatedRequest } from '../middleware/authenticate';
 import { HttpError } from '../utils/httpError';
@@ -36,26 +35,13 @@ export const loginHandler = async (
   }
 };
 
-export const sendOtpHandler = async (
+export const resendVerificationHandler = async (
   req: Request,
   res: Response,
   next: NextFunction,
 ) => {
   try {
-    const result = await sendOtp(req.body);
-    res.status(200).json(result);
-  } catch (error) {
-    next(error);
-  }
-};
-
-export const verifyOtpHandler = async (
-  req: Request,
-  res: Response,
-  next: NextFunction,
-) => {
-  try {
-    const result = await verifyOtp(req.body);
+    const result = await sendMagicLink(req.body);
     res.status(200).json(result);
   } catch (error) {
     next(error);
