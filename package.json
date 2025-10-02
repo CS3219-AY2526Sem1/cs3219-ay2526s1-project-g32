@@ -1,0 +1,11 @@
+{
+  "name": "peerprep-monorepo",
+  "private": true,
+  "workspaces": [
+    "user_service",
+    "frontend"
+  ],
+  "devDependencies": {
+    "@types/react": "^19.1.13"
+  }
+}
