@@ -5,3 +5,4 @@ user_service/dist/
 frontend/.next/
 frontend/out/
 frontend/.env.local
+matching_service/dump.rdb
