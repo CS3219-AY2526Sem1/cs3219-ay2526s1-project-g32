@@ -33,7 +33,34 @@ export const joinQueue = async (req: Request, res: Response) => {
     // Add user to Redis queue
     await redisService.enqueueUser(userId, topic as Topic);
     
-    // Create match request for RabbitMQ processing
+    // IMMEDIATE MATCH CHECK - Try to find a match right away
+    const matchedUserId = await redisService.findMatch(userId, topic as Topic);
+    
+    if (matchedUserId) {
+      // INSTANT MATCH FOUND
+      const matchId = generateMatchId(userId, matchedUserId);
+      
+      console.log(`⚡ INSTANT MATCH! ${userId} <-> ${matchedUserId} for topic ${topic}`);
+      
+      // Publish match result immediately
+      await rabbitmqService.publishMatchResult(userId, matchedUserId, topic as Topic, matchId);
+      
+      // Return immediate match response
+      return res.json({
+        success: true,
+        matched: true,
+        message: 'Match found instantly!',
+        data: {
+          matchId,
+          matchedWith: matchedUserId,
+          topic,
+          matchedAt: new Date().toISOString(),
+          matchTime: '<1 second'
+        }
+      });
+    }
+    
+    // No immediate match - continue with background processing
     const timestamp = Date.now();
     const matchRequest: MatchRequest = {
       userId,
@@ -51,14 +78,15 @@ export const joinQueue = async (req: Request, res: Response) => {
     
     res.json({ 
       success: true,
-      message: 'Successfully joined matchmaking queue. Background matching initiated.', 
+      matched: false,
+      message: 'Joined queue - background matching active. You will be notified when a match is found.', 
       data: {
         userId, 
         topic,
         position,
         queueSize,
         timeoutIn: '5 minutes',
-        message: 'You will be automatically notified when a match is found or when matching times out.'
+        message: 'No immediate match found. Background worker will continue searching.'
       }
     });
   } catch (error) {
@@ -69,6 +97,13 @@ export const joinQueue = async (req: Request, res: Response) => {
     });
   }
 };
+
+// Helper function to generate match ID
+function generateMatchId(userId1: string, userId2: string): string {
+  const timestamp = Date.now();
+  const sortedUsers = [userId1, userId2].sort(); // Ensure consistent ordering
+  return `match_${sortedUsers[0]}_${sortedUsers[1]}_${timestamp}`;
+}
 
 // Find a match for user
 export const findMatch = async (req: Request, res: Response) => {
