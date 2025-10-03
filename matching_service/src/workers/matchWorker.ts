@@ -104,11 +104,10 @@ export class MatchWorker {
         await redisService.removeUserFromQueue(userId, topic);
         console.log(`User ${userId} removed from queue due to timeout`);
         
-        // Here you would typically notify the user via WebSocket that matching timed out
-        // For now, we'll just log it
-        console.log(`Timeout notification needed for user ${userId}`);
+        // Publish timeout notification for WebSocket
+        await rabbitmqService.publishTimeoutNotification(userId, topic, 'timeout');
+        console.log(`Timeout notification published for user ${userId}`);
         
-        // TODO: Send timeout notification via WebSocket when implemented
       } else {
         console.log(`User ${userId} already removed from queue (likely matched), no timeout needed`);
       }

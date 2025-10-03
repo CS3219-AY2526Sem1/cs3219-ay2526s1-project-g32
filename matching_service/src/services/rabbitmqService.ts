@@ -24,6 +24,10 @@ export class RabbitMQService {
   private readonly MATCH_REQUEST_QUEUE = 'match-requests';
   private readonly MATCH_TIMEOUT_QUEUE = 'match-timeouts';
   private readonly MATCH_RESULT_EXCHANGE = 'match-results';
+  
+  // Notification queues
+  private readonly NOTIFICATION_MATCH_RESULTS_QUEUE = 'match-results';
+  private readonly NOTIFICATION_TIMEOUT_QUEUE = 'timeout-notifications';
 
   constructor() {}
 
@@ -93,6 +97,15 @@ export class RabbitMQService {
 
     // Create exchange for match results
     await this.channel.assertExchange(this.MATCH_RESULT_EXCHANGE, 'direct', { 
+      durable: true 
+    });
+
+    // Create notification queues
+    await this.channel.assertQueue(this.NOTIFICATION_MATCH_RESULTS_QUEUE, { 
+      durable: true 
+    });
+
+    await this.channel.assertQueue(this.NOTIFICATION_TIMEOUT_QUEUE, { 
       durable: true 
     });
 
@@ -218,12 +231,53 @@ export class RabbitMQService {
       { persistent: true }
     );
 
+    // Publish to notification queue for WebSocket notifications
+    const notificationData = {
+      user1Id: userId1,
+      user2Id: userId2,
+      matchId,
+      topic,
+      matchedAt: new Date().toISOString()
+    };
+
+    await this.channel.sendToQueue(
+      this.NOTIFICATION_MATCH_RESULTS_QUEUE,
+      Buffer.from(JSON.stringify(notificationData)),
+      { persistent: true }
+    );
+
     console.log(`Published match result for users ${userId1} and ${userId2}`);
+  }
+
+  // Publish timeout notification
+  async publishTimeoutNotification(userId: string, topic: Topic, reason: 'timeout' | 'no_match_found' = 'timeout'): Promise<void> {
+    if (!this.channel) throw new Error('RabbitMQ channel not initialized');
+
+    const timeoutNotification = {
+      userId,
+      topic,
+      timeoutAt: new Date().toISOString(),
+      reason
+    };
+
+    await this.channel.sendToQueue(
+      this.NOTIFICATION_TIMEOUT_QUEUE,
+      Buffer.from(JSON.stringify(timeoutNotification)),
+      { persistent: true }
+    );
+
+    console.log(`Published timeout notification for user ${userId} with topic ${topic}`);
   }
 
   // Health check
   isHealthy(): boolean {
     return this.isConnected && this.channel !== null;
+  }
+
+  // Get channel for notification consumer
+  getChannel() {
+    if (!this.channel) throw new Error('RabbitMQ channel not initialized');
+    return this.channel;
   }
 }
 
