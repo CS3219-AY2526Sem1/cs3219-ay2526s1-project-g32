@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { redisService } from '../services/redisService';
+import { rabbitmqService, MatchRequest } from '../services/rabbitmqService';
 import { Topic } from '../types';
 
 // Join matchmaking queue
@@ -7,9 +8,9 @@ export const joinQueue = async (req: Request, res: Response) => {
   const { userId, topic } = req.body;
   
   // Validate required fields
-  if (!topic) {
+  if (!userId || !topic) {
     return res.status(400).json({
-        error: 'Missing required fields: topic'
+        error: 'Missing required fields: userId and topic'
     });
   }
 
@@ -29,8 +30,20 @@ export const joinQueue = async (req: Request, res: Response) => {
       });
     }
     
-    // Add user to queue
+    // Add user to Redis queue
     await redisService.enqueueUser(userId, topic as Topic);
+    
+    // Create match request for RabbitMQ processing
+    const timestamp = Date.now();
+    const matchRequest: MatchRequest = {
+      userId,
+      topic: topic as Topic,
+      timestamp,
+      timeoutAt: timestamp + 300000 // 5 minutes from now
+    };
+
+    // Publish to message queue for background processing
+    await rabbitmqService.publishMatchRequest(matchRequest);
     
     // Get user's position in queue
     const position = await redisService.getUserPosition(userId, topic as Topic);
@@ -38,12 +51,14 @@ export const joinQueue = async (req: Request, res: Response) => {
     
     res.json({ 
       success: true,
-      message: 'Successfully joined matchmaking queue', 
+      message: 'Successfully joined matchmaking queue. Background matching initiated.', 
       data: {
         userId, 
         topic,
         position,
-        queueSize
+        queueSize,
+        timeoutIn: '5 minutes',
+        message: 'You will be automatically notified when a match is found or when matching times out.'
       }
     });
   } catch (error) {
