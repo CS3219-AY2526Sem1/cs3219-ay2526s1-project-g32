@@ -4,14 +4,15 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import type { Route } from 'next';
 import { useState } from 'react';
-import { Alert, Button, Card, Form, Input, Typography } from 'antd';
+import { Alert, Button, Card, ConfigProvider, Form, Input, Typography } from 'antd';
+import { MailOutlined, LockOutlined, UserOutlined } from '@ant-design/icons';
 
 import { register as registerApi, type RegisterPayload } from '../../lib/api-client';
 
 const LOGIN_ROUTE = '/login' as Route;
 const VERIFY_EMAIL_ROUTE = '/verify-email' as Route;
 
-const { Title, Paragraph } = Typography;
+const { Title, Paragraph, Text } = Typography;
 
 export default function RegisterPage() {
   const [form] = Form.useForm<RegisterPayload>();
@@ -41,52 +42,133 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="auth-shell">
-      <Card>
-        <Title level={3}>Create your PeerPrep account</Title>
-        <Paragraph>Pick a username and we will email you a magic link to verify your address.</Paragraph>
-        <Form
-          form={form}
-          layout="vertical"
-          requiredMark={false}
-          onFinish={handleFinish}
-          initialValues={{ username: '', email: '', password: '' }}
-        >
-          <Form.Item
-            label="Username"
-            name="username"
-            rules={[{ required: true, message: 'Username is required' }]}
+    <ConfigProvider
+      theme={{
+        token: {
+          colorPrimary: '#137fec',
+          colorBgBase: '#0A1017',
+          colorTextBase: '#ffffff',
+          colorBorder: 'rgba(255,255,255,0.1)',
+          fontFamily:
+            '"Space Grotesk","Noto Sans",system-ui,-apple-system,"Segoe UI",sans-serif',
+        },
+        components: {
+          Card: {
+            colorBgContainer: 'rgba(255,255,255,0.04)',
+            headerBg: 'transparent',
+            headerPadding: 0,
+          },
+          Input: {
+            colorBgContainer: '#2d3748',
+            colorBorder: '#374151',
+            colorTextPlaceholder: '#9CA3AF',
+            borderRadius: 10,
+            controlHeight: 44,
+            paddingBlock: 10,
+          },
+          Button: {
+            borderRadius: 10,
+            fontWeight: 600,
+          },
+          Form: {
+            labelColor: 'rgba(255,255,255,0.75)',
+          },
+        },
+      }}
+    >
+      {/* Brand header (reusing .auth-header) */}
+      <header className="auth-header">
+        <svg width="32" height="32" viewBox="0 0 48 48" fill="none" style={{ color: '#137fec' }}
+             xmlns="http://www.w3.org/2000/svg">
+          <path d="M6 6H42L36 24L42 42H6L12 24L6 6Z" fill="currentColor" />
+        </svg>
+        <Title level={3} style={{ margin: 0 }}>PeerPrep</Title>
+      </header>
+
+      <div className="auth-shell">
+        <Card className="auth-card" bordered>
+          <div style={{ textAlign: 'center', marginBottom: 8 }}>
+            <Title level={2} style={{ marginBottom: 6 }}>Create your account</Title>
+            <Paragraph style={{ color: 'rgba(255,255,255,0.7)', marginBottom: 0 }}>
+              Pick a username and we’ll email you a magic link to verify your address.
+            </Paragraph>
+          </div>
+
+          <Form<RegisterPayload>
+            form={form}
+            layout="vertical"
+            requiredMark={false}
+            onFinish={handleFinish}
+            initialValues={{ username: '', email: '', password: '' }}
+            className="form-inter auth-input auth-primary"
+            style={{ marginTop: 24 }}
           >
-            <Input size="large" placeholder="peerprep-user" autoComplete="username" />
-          </Form.Item>
-          <Form.Item
-            label="Email"
-            name="email"
-            rules={[{ required: true, message: 'Email is required' }, { type: 'email', message: 'Invalid email' }]}
-          >
-            <Input size="large" placeholder="jane@peerprep.com" autoComplete="email" />
-          </Form.Item>
-          <Form.Item
-            label="Password"
-            name="password"
-            rules={[{ required: true, message: 'Password is required' }, { min: 8, message: 'Minimum 8 characters' }]}
-          >
-            <Input.Password size="large" placeholder="Create a password" autoComplete="new-password" />
-          </Form.Item>
-          {error ? <Alert type="error" showIcon message={error} style={{ marginBottom: 16 }} /> : null}
-          {success ? <Alert type="success" showIcon message={success} style={{ marginBottom: 16 }} /> : null}
-          <Form.Item>
-            <Button type="primary" htmlType="submit" block size="large" loading={loading}>
-              Create account
-            </Button>
-          </Form.Item>
-        </Form>
-        <Paragraph style={{ textAlign: 'center' }}>
-          Already verified? <Link href={LOGIN_ROUTE}>Sign in here</Link>
-        </Paragraph>
-      </Card>
-    </div>
+            <Form.Item
+              name="username"
+              rules={[{ required: true, message: 'Username is required' }]}
+            >
+              <Input
+                size="large"
+                autoComplete="username"
+                placeholder="Username"
+                prefix={<UserOutlined style={{ color: '#9CA3AF' }} />}
+              />
+            </Form.Item>
+
+            <Form.Item
+              name="email"
+              rules={[
+                { required: true, message: 'Email is required' },
+                { type: 'email', message: 'Invalid email' },
+              ]}
+            >
+              <Input
+                size="large"
+                autoComplete="email"
+                placeholder="Email"
+                prefix={<MailOutlined style={{ color: '#9CA3AF' }} />}
+              />
+            </Form.Item>
+
+            <Form.Item
+              name="password"
+              rules={[
+                { required: true, message: 'Password is required' },
+                { min: 8, message: 'Minimum 8 characters' },
+              ]}
+            >
+              <Input.Password
+                size="large"
+                autoComplete="new-password"
+                placeholder="Password"
+                iconRender={(visible) => (
+                  <LockOutlined style={{ color: visible ? '#ffffff' : '#9CA3AF' }} />
+                )}
+              />
+            </Form.Item>
+
+            {error ? (
+              <Alert type="error" showIcon message={error} style={{ marginBottom: 12 }} />
+            ) : null}
+            {success ? (
+              <Alert type="success" showIcon message={success} style={{ marginBottom: 12 }} />
+            ) : null}
+
+            <Form.Item style={{ marginBottom: 0 }}>
+              <Button type="primary" htmlType="submit" block size="large" loading={loading}>
+                Sign up
+              </Button>
+            </Form.Item>
+          </Form>
+
+          <Paragraph style={{ textAlign: 'center', marginTop: 16 }}>
+            <Text style={{ color: 'rgba(255,255,255,0.7)' }}>Already have an account? </Text>
+            <Link href={LOGIN_ROUTE} className="ant-typography" style={{ color: '#137fec' }}>
+              Log in
+            </Link>
+          </Paragraph>
+        </Card>
+      </div>
+    </ConfigProvider>
   );
 }
-
-
