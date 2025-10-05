@@ -3,13 +3,12 @@
 import { useCallback, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import type { Route } from 'next';
-import { Alert, Button, Card, Typography } from 'antd';
+import { Alert, Button, Card, ConfigProvider, Typography, Space } from 'antd';
 
 import { resendMagicLink } from '../../lib/api-client';
 
 const LOGIN_ROUTE = '/login' as Route;
-
-const { Title, Paragraph } = Typography;
+const { Title, Paragraph, Text } = Typography;
 
 export default function VerifyEmailPage() {
   const searchParams = useSearchParams();
@@ -39,23 +38,93 @@ export default function VerifyEmailPage() {
   }, [email]);
 
   return (
-    <div className="auth-shell">
-      <Card>
-        <Title level={3}>Check your inbox</Title>
-        <Paragraph>
-          We sent a magic link {email ? `to ${email}` : 'to your email address'}. Open it on the same device to verify your
-          account.
-        </Paragraph>
-        <Paragraph>If you don&apos;t see the email, check your spam folder or request another link below.</Paragraph>
-        {message ? <Alert type="success" showIcon message={message} style={{ marginBottom: 16 }} /> : null}
-        {error ? <Alert type="error" showIcon message={error} style={{ marginBottom: 16 }} /> : null}
-        <Button block size="large" onClick={handleResend} loading={loading} disabled={!email} style={{ marginBottom: 12 }}>
-          Resend magic link
-        </Button>
-        <Button type="primary" href={LOGIN_ROUTE} block size="large">
-          Back to login
-        </Button>
-      </Card>
-    </div>
+    <ConfigProvider
+      theme={{
+        token: {
+          colorPrimary: '#137fec',
+          colorBgBase: '#0A1017',
+          colorTextBase: '#ffffff',
+          colorBorder: 'rgba(255,255,255,0.1)',
+          fontFamily:
+            '"Space Grotesk","Noto Sans",system-ui,-apple-system,"Segoe UI",sans-serif',
+        },
+        components: {
+          Card: {
+            colorBgContainer: 'rgba(255,255,255,0.04)',
+            headerBg: 'transparent',
+            headerPadding: 0,
+          },
+          Button: {
+            borderRadius: 10,
+            fontWeight: 600,
+          },
+          Typography: {},
+        },
+      }}
+    >
+      {/* Brand header (reuses .auth-header) */}
+      <header className="auth-header">
+        <svg
+          width="32"
+          height="32"
+          viewBox="0 0 48 48"
+          fill="none"
+          style={{ color: '#137fec' }}
+          xmlns="http://www.w3.org/2000/svg"
+          aria-hidden="true"
+        >
+          <path d="M6 6H42L36 24L42 42H6L12 24L6 6Z" fill="currentColor" />
+        </svg>
+        <Title level={3} style={{ margin: 0 }}>PeerPrep</Title>
+      </header>
+
+      <div className="auth-shell">
+        <Card className="auth-card" bordered>
+          <div style={{ textAlign: 'center' }}>
+
+            <Title level={2} style={{ marginBottom: 6 }}>Check your inbox</Title>
+
+            <Paragraph style={{ color: 'rgba(255,255,255,0.8)' }}>
+              We sent a magic link{' '}
+              {email ? (
+                <>
+                  to <Text code style={{ color: '#fff' }}>{email}</Text>
+                </>
+              ) : (
+                'to your email address'
+              )}
+              . Open it on the same device to verify your account.
+            </Paragraph>
+
+            <Paragraph style={{ color: 'rgba(255,255,255,0.7)', marginBottom: 20 }}>
+              If you don’t see the email, check your spam folder or request another link below.
+            </Paragraph>
+
+            <Space direction="vertical" style={{ width: '100%' }} size="middle">
+              {message ? (
+                <Alert type="success" showIcon message={message} />
+              ) : null}
+              {error ? (
+                <Alert type="error" showIcon message={error} />
+              ) : null}
+
+              <Button
+                block
+                size="large"
+                onClick={handleResend}
+                loading={loading}
+                disabled={!email}
+              >
+                Resend magic link
+              </Button>
+
+              <Button type="primary" href={LOGIN_ROUTE} block size="large">
+                Back to login
+              </Button>
+            </Space>
+          </div>
+        </Card>
+      </div>
+    </ConfigProvider>
   );
 }
