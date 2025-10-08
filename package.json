@@ -3,7 +3,8 @@
   "private": true,
   "workspaces": [
     "user_service",
-    "frontend"
+    "frontend",
+    "collaboration_service"
   ],
   "devDependencies": {
     "@types/react": "^19.1.13"
