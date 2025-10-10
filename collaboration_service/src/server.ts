@@ -4,7 +4,7 @@ import { buildApp } from './app';
 import { config } from './config';
 import { SessionController } from './controllers';
 import { RedisPresenceRepository, RedisSessionRepository } from './repositories';
-import { SessionManager, StubQuestionServiceClient, StubUserServiceClient } from './services';
+import { SessionManager, StubQuestionServiceClient } from './services';
 import { logger } from './utils/logger';
 
 const redis = new Redis(config.redis.url);
@@ -19,9 +19,13 @@ const sessionManager = new SessionManager(sessionRepository, presenceRepository,
 });
 
 const questionClient = new StubQuestionServiceClient();
-const userClient = new StubUserServiceClient();
 
-const sessionController = new SessionController(sessionManager, questionClient, userClient, config.websocket.baseUrl);
+const sessionController = new SessionController(
+  sessionManager,
+  questionClient,
+  config.services.user.baseUrl,
+  config.websocket.baseUrl,
+);
 
 const app = buildApp({ sessionController });
 
