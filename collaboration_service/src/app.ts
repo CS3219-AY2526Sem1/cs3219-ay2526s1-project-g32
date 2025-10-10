@@ -6,10 +6,11 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 
 import { config } from './config';
+import type { RouteDependencies } from './routes';
 import { registerRoutes } from './routes';
 import { logger } from './utils/logger';
 
-export const buildApp = (): Application => {
+export const buildApp = (deps: RouteDependencies): Application => {
   const app = express();
 
   app.set('trust proxy', true);
@@ -42,7 +43,7 @@ export const buildApp = (): Application => {
     }),
   );
 
-  registerRoutes(app);
+  registerRoutes(app, deps);
 
   app.use((req, res) => {
     res.status(404).json({

@@ -17,7 +17,7 @@ const parseHost = (value: string | undefined): string => {
   return value;
 };
 
-const parseTtl = (value: string | undefined, fallback: number): number => {
+const parsePositiveNumber = (value: string | undefined, fallback: number): number => {
   if (!value) {
     return fallback;
   }
@@ -45,9 +45,15 @@ export const config = {
   },
   jwt: {
     secret: env.JWT_SECRET,
-    sessionTokenTtlSeconds: parseTtl(env.SESSION_TOKEN_TTL_SECONDS, 300),
+    sessionTokenTtlSeconds: parsePositiveNumber(env.SESSION_TOKEN_TTL_SECONDS, 300),
   },
   logger: {
     level: env.LOG_LEVEL ?? (env.NODE_ENV === 'production' ? 'info' : 'debug'),
+  },
+  session: {
+    gracePeriodMs: parsePositiveNumber(env.SESSION_GRACE_PERIOD_SECONDS, 300) * 1000,
+  },
+  websocket: {
+    baseUrl: env.COLLAB_WS_BASE_URL,
   },
 };

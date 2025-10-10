@@ -1,8 +1,29 @@
+import Redis from 'ioredis';
+
 import { buildApp } from './app';
 import { config } from './config';
+import { SessionController } from './controllers';
+import { RedisPresenceRepository, RedisSessionRepository } from './repositories';
+import { SessionManager, StubQuestionServiceClient, StubUserServiceClient } from './services';
 import { logger } from './utils/logger';
 
-const app = buildApp();
+const redis = new Redis(config.redis.url);
+
+const sessionRepository = new RedisSessionRepository(redis);
+const presenceRepository = new RedisPresenceRepository(redis, Math.ceil(config.session.gracePeriodMs / 1000));
+
+const sessionManager = new SessionManager(sessionRepository, presenceRepository, {
+  gracePeriodMs: config.session.gracePeriodMs,
+  sessionTokenTtlSeconds: config.jwt.sessionTokenTtlSeconds,
+  jwtSecret: config.jwt.secret,
+});
+
+const questionClient = new StubQuestionServiceClient();
+const userClient = new StubUserServiceClient();
+
+const sessionController = new SessionController(sessionManager, questionClient, userClient, config.websocket.baseUrl);
+
+const app = buildApp({ sessionController });
 
 const start = () => {
   const server = app.listen(config.http.port, config.http.host, () => {
@@ -16,3 +37,16 @@ const start = () => {
 };
 
 start();
+
+const gracefulShutdown = () => {
+  redis
+    .quit()
+    .then(() => process.exit(0))
+    .catch((error) => {
+      logger.error({ err: error }, 'Failed to close Redis connection');
+      process.exit(1);
+    });
+};
+
+process.on('SIGINT', gracefulShutdown);
+process.on('SIGTERM', gracefulShutdown);

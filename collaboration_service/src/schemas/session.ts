@@ -93,3 +93,8 @@ export const PresenceRecordSchema = z.object({
   lastSeenAt: z.number().int().nonnegative(),
 });
 export type PresenceRecord = z.infer<typeof PresenceRecordSchema>;
+
+export const SessionIdParamsSchema = z.object({
+  sessionId: z.string().uuid(),
+});
+export type SessionIdParams = z.infer<typeof SessionIdParamsSchema>;

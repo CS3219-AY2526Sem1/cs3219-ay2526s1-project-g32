@@ -12,6 +12,8 @@ const envSchema = z.object({
   USER_SERVICE_URL: z.string().url().default('http://localhost:4001/api/v1'),
   JWT_SECRET: z.string().min(1, 'JWT_SECRET is required').default('dev-change-me'),
   SESSION_TOKEN_TTL_SECONDS: z.string().optional(),
+  SESSION_GRACE_PERIOD_SECONDS: z.string().optional(),
+  COLLAB_WS_BASE_URL: z.string().url().default('ws://localhost:4010/collab'),
   LOG_LEVEL: z.string().optional()
 });
 
