@@ -1,7 +1,8 @@
 import type { Redis } from 'ioredis';
 
 import type { PresenceRecord } from '../types';
-import { NotImplementedError } from '../errors/notImplementedError';
+import { PresenceRecordSchema } from '../schemas';
+import { sessionPresenceKey } from './keys';
 
 export interface PresenceRepository {
   setPresence(sessionId: string, record: PresenceRecord): Promise<void>;
@@ -11,21 +12,40 @@ export interface PresenceRepository {
 }
 
 export class RedisPresenceRepository implements PresenceRepository {
-  constructor(private readonly client: Redis) {}
+  constructor(private readonly client: Redis, private readonly ttlSeconds: number | null = null) {}
 
-  async setPresence(_sessionId: string, _record: PresenceRecord): Promise<void> {
-    throw new NotImplementedError('PresenceRepository.setPresence');
+  async setPresence(sessionId: string, record: PresenceRecord): Promise<void> {
+    const key = sessionPresenceKey(sessionId);
+    await this.client.hset(key, record.userId, JSON.stringify(record));
+
+    if (this.ttlSeconds && this.ttlSeconds > 0) {
+      await this.client.expire(key, this.ttlSeconds);
+    }
   }
 
-  async getPresence(_sessionId: string): Promise<PresenceRecord[]> {
-    throw new NotImplementedError('PresenceRepository.getPresence');
+  async getPresence(sessionId: string): Promise<PresenceRecord[]> {
+    const key = sessionPresenceKey(sessionId);
+    const entries = await this.client.hgetall(key);
+
+    return Object.values(entries).map((value) => this.parseRecord(value));
   }
 
-  async clearPresence(_sessionId: string): Promise<void> {
-    throw new NotImplementedError('PresenceRepository.clearPresence');
+  async clearPresence(sessionId: string): Promise<void> {
+    const key = sessionPresenceKey(sessionId);
+    await this.client.del(key);
   }
 
-  async removeParticipant(_sessionId: string, _userId: string): Promise<void> {
-    throw new NotImplementedError('PresenceRepository.removeParticipant');
+  async removeParticipant(sessionId: string, userId: string): Promise<void> {
+    const key = sessionPresenceKey(sessionId);
+    await this.client.hdel(key, userId);
+  }
+
+  private parseRecord(value: string): PresenceRecord {
+    try {
+      const parsed = JSON.parse(value) as unknown;
+      return PresenceRecordSchema.parse(parsed);
+    } catch (error) {
+      throw new Error('Failed to parse presence record from Redis');
+    }
   }
 }
