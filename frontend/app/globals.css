@@ -1,28 +1,231 @@
-:root {
-  color-scheme: light;
-  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+/* Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;700;900&family=Space+Grotesk:wght@400;500;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap');
+
+
+:root{
+  /* Brand color */
+  --primary-50: #eef7ff;
+  --primary-100: #d9ecff;
+  --primary-200: #bce0ff;
+  --primary-300: #8ecfff;
+  --primary-400: #5abaff;
+  --primary-500: #309eff;
+  --primary-600: #1380ec;
+  --primary-700: #0d68c9;
+  --primary-800: #0f56a3;
+  --primary-900: #114882;
+  --primary-950: #0a2a4d;
+
+  --login-primary: #6366F1;
+
+  --bg: #0A1017;
+  --text: #ffffff;
+  --muted: rgba(255,255,255,0.7);
+  --border: rgba(255,255,255,0.10);
+
+  color-scheme: dark;
+}
+
+html, body {
+  height: 100%;
 }
 
 body {
   margin: 0;
   min-height: 100vh;
-  background: #f5f5f5;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Space Grotesk","Noto Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 
 .main-content {
   min-height: calc(100vh - 64px);
-  padding: 48px 24px;
+  padding: 56px 24px;
+  position: relative;
+  overflow: hidden; /* needed for the gradient blobs */
 }
 
-.auth-shell {
-  max-width: 420px;
-  margin: 60px auto;
+.header-dark {
+  background: transparent !important;
+  border-bottom: 1px solid var(--border);
+  padding-inline: 40px !important;
 }
 
-.centered-section {
+/* Make Ant buttons/links feel like template */
+a, .ant-typography a {
+  color: var(--muted);
+}
+a:hover, .ant-typography a:hover { color: var(--text); }
+
+/* Primary button */
+.ant-btn-primary {
+  background: var(--primary-600);
+  border-color: var(--primary-600);
+  box-shadow: 0 10px 24px rgba(19,128,236,0.20);
+}
+.ant-btn-primary:hover, .ant-btn-primary:focus {
+  background: var(--primary-700);
+  border-color: var(--primary-700);
+}
+
+/* Ghost/Link buttons on dark */
+.ant-btn-link, .ant-btn-text {
+  color: var(--muted);
+}
+.ant-btn-link:hover, .ant-btn-text:hover {
+  color: var(--text);
+}
+
+/* Hero text sizing like template */
+.hero-title {
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+  font-size: clamp(2.25rem, 3vw + 1rem, 3.75rem);
+}
+.hero-sub {
+  color: rgba(255,255,255,0.75);
+  font-size: 1.125rem;
+}
+
+.bg-blur-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  backdrop-filter: blur(36px);
+  -webkit-backdrop-filter: blur(36px);
+  background: rgba(10, 16, 23, 0.35);
+}
+
+/* Gradient “blob” decorations (top/back) */
+.blob, .blob-bottom {
+  position: absolute;
+  inset: auto 0 auto 50%;
+  width: min(1155px, 72vw);
+  height: auto;
+  aspect-ratio: 1155/678;
+  filter: blur(60px);
+  opacity: 0.18;
+  transform: translateX(-50%) rotate(30deg);
+  background: linear-gradient(to top right, #ff80b5, #9089fc);
+  z-index: 0;
+  clip-path: polygon(
+    74.1% 44.1%, 100% 61.6%, 97.5% 26.9%, 85.5% 0.1%, 80.7% 2%, 72.5% 32.5%,
+    60.2% 62.4%, 52.4% 68.1%, 47.5% 58.3%, 45.2% 34.5%, 27.5% 76.7%,
+    0.1% 64.9%, 17.9% 100%, 27.6% 76.8%, 76.1% 97.7%, 74.1% 44.1%
+  );
+}
+.blob {
+  top: -160px;
+}
+.blob-bottom {
+  bottom: -200px;
+  transform: translateX(30%) rotate(0deg);
+}
+
+.dark-card .ant-card {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--border);
+  backdrop-filter: blur(8px);
+}
+.dark-card .ant-card-head-title {
+  color: var(--text);
+}
+.dark-card .ant-typography, .dark-card .ant-card-body {
+  color: var(--muted);
+}
+
+/* Utility spacing that echoes template */
+.hero-actions .ant-btn {
+  height: 40px;
+  padding: 0 20px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+}
+
+.hero-center {
+  position: relative;
+  z-index: 2;              
+  max-width: 820px;
+  margin: 0 auto;
+  text-align: center;
+  padding: 56px 16px;
+  display: grid;
+  place-items: center;
+  min-height: calc(100vh - 64px);
+}
+
+/* Ensure Ant Typography uses white */
+.ant-typography { color: var(--text); }
+
+/* Simple brand header on dark */
+.auth-header {
   display: flex;
   align-items: center;
-  justify-content: center;
-  min-height: calc(100vh - 64px);
-  padding: 48px 24px;
+  gap: 12px;
+  padding: 20px 40px;
 }
+
+/* Centered auth shell on dark */
+.auth-shell {
+  max-width: 420px;
+  margin: 48px auto 64px;
+  padding: 0 16px;
+  position: relative;
+}
+
+/* Dark “card” look for login panel */
+.auth-card .ant-card {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.10);
+  backdrop-filter: blur(8px);
+  color: #fff;
+}
+.auth-card .ant-card-head-title {
+  color: #fff;
+}
+
+/* Use Inter inside the form area, Space Grotesk for headings */
+.form-inter, .form-inter .ant-typography, .form-inter .ant-input, .form-inter .ant-form-item {
+  font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+/* Inputs styled like mock: rounded, dark, subtle borders */
+.auth-input .ant-input,
+.auth-input .ant-input-affix-wrapper {
+  background: #111827;        
+  border-color: #374151;  
+  color: #fff;
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+.auth-input .ant-input::placeholder { color: #9CA3AF; } 
+.auth-input .ant-input:focus,
+.auth-input .ant-input-affix-wrapper-focused {
+  border-color: var(--login-primary);
+  box-shadow: 0 0 0 2px rgba(99,102,241,0.25);
+}
+
+/* Buttons: indigo primary */
+.auth-primary .ant-btn-primary {
+  background: var(--login-primary);
+  border-color: var(--login-primary);
+}
+.auth-primary .ant-btn-primary:hover,
+.auth-primary .ant-btn-primary:focus {
+  background: #575AE6; 
+  border-color: #575AE6;
+}
+
+/* Links under card */
+.auth-link {
+  color: rgba(255,255,255,0.7);
+}
+.auth-link .ant-btn-link {
+  padding: 0;
+  height: auto;
+  color: var(--login-primary);
+}
+.auth-link .ant-btn-link:hover { color: #A5B4FC; }
