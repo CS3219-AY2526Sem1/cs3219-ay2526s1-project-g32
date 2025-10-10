@@ -34,10 +34,3 @@ export const verifyOtpSchema = {
       .regex(/^[0-9]+$/, 'OTP token must be numeric'),
   }),
 };
-
-export const validateTokenSchema = {
-  body: z.object({
-    accessToken: z.string().min(1, 'accessToken is required'),
-    userId: z.string().min(1, 'userId is required'),
-  }),
-};

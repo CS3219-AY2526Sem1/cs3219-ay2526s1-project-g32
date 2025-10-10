@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import type { Route } from 'next';
 import { useState } from 'react';
-import { Alert, Button, Card, ConfigProvider, Form, Input, Typography } from 'antd';
+import { Alert, Button, Card, Form, Input, Typography } from 'antd';
 
 import { login as loginApi, type LoginPayload } from '../../lib/api-client';
 import { useAuth } from '../../hooks/useAuth';
@@ -35,98 +35,42 @@ export default function LoginPage() {
   };
 
   return (
-    <ConfigProvider
-      theme={{
-        token: {
-          colorPrimary: '#6366F1',
-          colorBgBase: '#0A1017',
-          colorTextBase: '#ffffff',
-          colorBorder: 'rgba(255,255,255,0.1)',
-          fontFamily: '"Space Grotesk","Noto Sans",system-ui,-apple-system,"Segoe UI",sans-serif',
-        },
-        components: {
-          Card: {
-            colorBgContainer: 'rgba(255,255,255,0.04)',
-            headerBg: 'transparent',
-            headerPadding: 0,
-          },
-          Input: {
-            colorBgContainer: '#111827',
-            colorBorder: '#374151',
-            colorTextPlaceholder: '#9CA3AF',
-            borderRadius: 10,
-            controlHeight: 40,
-          },
-          Button: {
-            borderRadius: 10,
-            fontWeight: 600,
-          },
-          Form: {
-            labelColor: 'rgba(255,255,255,0.75)',
-          },
-        },
-      }}
-    >
-      <header className="auth-header">
-        <Title level={3} style={{ margin: 0 }}>PeerPrep</Title>
-      </header>
-
-      <div className="auth-shell">
-        <Card className="auth-card" bordered>
-          <div style={{ textAlign: 'center', marginBottom: 8 }}>
-            <Title level={2} style={{ marginBottom: 4 }}>Welcome back</Title>
-            <Paragraph style={{ color: 'rgba(255,255,255,0.7)', marginBottom: 24, fontFamily: 'Inter, system-ui, -apple-system, "Segoe UI", sans-serif' }}>
-              Don&apos;t have an account?{' '}
-              <Button type="link" href={REGISTER_ROUTE}>
-                Sign up
-              </Button>
-            </Paragraph>
-          </div>
-
-          <Form<LoginPayload>
-            form={form}
-            layout="vertical"
-            onFinish={handleFinish}
-            requiredMark={false}
-            initialValues={{ email: '', password: '' }}
-            className="form-inter auth-input auth-primary"
+    <div className="auth-shell">
+      <Card>
+        <Title level={3}>Welcome back</Title>
+        <Paragraph>Enter your credentials to join a session or manage your profile.</Paragraph>
+        <Form
+          form={form}
+          layout="vertical"
+          onFinish={handleFinish}
+          requiredMark={false}
+          initialValues={{ email: '', password: '' }}
+        >
+          <Form.Item
+            label="Email"
+            name="email"
+            rules={[{ required: true, message: 'Please enter your email' }, { type: 'email', message: 'Invalid email' }]}
           >
-            <Form.Item
-              name="email"
-              rules={[
-                { required: true, message: 'Please enter your email' },
-                { type: 'email', message: 'Invalid email' },
-              ]}
-            >
-              <Input size="large" autoComplete="email" placeholder="Email address" />
-            </Form.Item>
-
-            <Form.Item
-              name="password"
-              rules={[{ required: true, message: 'Please enter your password' }]}
-            >
-              <Input.Password size="large" autoComplete="current-password" placeholder="Password" />
-            </Form.Item>
-
-            {error ? (
-              <Alert type="error" showIcon message={error} style={{ marginBottom: 12 }} />
-            ) : null}
-
-            <Form.Item style={{ marginBottom: 0 }}>
-              <Button type="primary" htmlType="submit" block size="large" loading={loading}>
-                Log in
-              </Button>
-            </Form.Item>
-          </Form>
-
-          <Paragraph className="auth-link" style={{ textAlign: 'center', marginTop: 16 }}>
-            Need an account?{' '}
-            <Button type="link" href={REGISTER_ROUTE}>
-              Register here
+            <Input size="large" autoComplete="email" placeholder="jane@peerprep.com" />
+          </Form.Item>
+          <Form.Item
+            label="Password"
+            name="password"
+            rules={[{ required: true, message: 'Please enter your password' }]}
+          >
+            <Input.Password size="large" autoComplete="current-password" placeholder="Enter password" />
+          </Form.Item>
+          {error ? <Alert type="error" showIcon message={error} style={{ marginBottom: 16 }} /> : null}
+          <Form.Item>
+            <Button type="primary" htmlType="submit" block size="large" loading={loading}>
+              Sign in
             </Button>
-          </Paragraph>
-        </Card>
-      </div>
-    </ConfigProvider>
+          </Form.Item>
+        </Form>
+        <Paragraph style={{ textAlign: 'center' }}>
+          Need an account? <Button type="link" href={REGISTER_ROUTE}>Register here</Button>
+        </Paragraph>
+      </Card>
+    </div>
   );
 }
