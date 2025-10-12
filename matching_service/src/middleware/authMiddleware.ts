@@ -3,8 +3,8 @@ import axios from 'axios';
 
 // Define a custom interface to extend the Express Request object
 // This allows us to safely attach the authenticated user's data to the request
-interface AuthenticatedRequest extends Request {
-  user?: any; // You can define a more specific User type here if you have one
+export interface AuthenticatedRequest extends Request {
+  user?: { id: string; [key: string]: any }; // More specific type for user object
 }
 
 // URL for the auth service, loaded from environment variables
@@ -32,7 +32,12 @@ export const authMiddleware = async (req: AuthenticatedRequest, res: Response, n
 
     // 3. If the token is valid, the auth-service will return user data.
     // Attach the user data to the request object for later use in the controller.
-    req.user = response.data;
+    // Ensure the user object has an 'id' property that controllers expect
+    const userData = response.data;
+    req.user = {
+      id: userData.id || userData.userId || userData.user?.id,
+      ...userData
+    };
 
     // 4. Pass control to the next middleware or the route's controller
     next();
