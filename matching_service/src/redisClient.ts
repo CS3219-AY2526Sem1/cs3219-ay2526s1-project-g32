@@ -6,11 +6,9 @@
 
 import { createClient } from 'redis';
 
-// Create a new Redis client instance.
-// By default, it will try to connect to a Redis server running on localhost:6379.
-// You can configure the URL if your Redis server is elsewhere:
-// const client = createClient({ url: 'redis://user:password@redis-server:6379' });
-const redisClient = createClient();
+// Create a new Redis client instance using environment variable
+const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
+const redisClient = createClient({ url: REDIS_URL });
 
 // Handle connection errors.
 redisClient.on('error', (err) => {
