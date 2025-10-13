@@ -5,6 +5,7 @@ import { config } from './config';
 import { SessionController } from './controllers';
 import { RedisPresenceRepository, RedisSessionRepository } from './repositories';
 import { SessionManager, StubQuestionServiceClient } from './services';
+import { attachCollaborationGateway } from './websocket';
 import { logger } from './utils/logger';
 
 const redis = new Redis(config.redis.url);
@@ -28,10 +29,18 @@ const sessionController = new SessionController(
 );
 
 const app = buildApp({ sessionController });
+let websocketGateway: ReturnType<typeof attachCollaborationGateway> | null = null;
 
 const start = () => {
   const server = app.listen(config.http.port, config.http.host, () => {
     logger.info(`Collaboration service listening on ${config.http.host}:${config.http.port}`);
+  });
+
+  websocketGateway = attachCollaborationGateway(server, {
+    path: config.websocket.path,
+    sessionManager,
+    jwtSecret: config.jwt.secret,
+    heartbeatMs: Math.min(Math.max(config.session.gracePeriodMs / 2, 15000), 60000),
   });
 
   server.on('error', (error) => {
@@ -50,6 +59,13 @@ const gracefulShutdown = () => {
       logger.error({ err: error }, 'Failed to close Redis connection');
       process.exit(1);
     });
+
+  if (websocketGateway) {
+    websocketGateway.clients.forEach((client) => {
+      client.terminate();
+    });
+    websocketGateway.close();
+  }
 };
 
 process.on('SIGINT', gracefulShutdown);

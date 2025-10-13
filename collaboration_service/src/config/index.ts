@@ -26,6 +26,19 @@ const parsePositiveNumber = (value: string | undefined, fallback: number): numbe
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 };
 
+const parseWebsocketConfig = (value: string) => {
+  try {
+    const url = new URL(value);
+    const normalizedPath =
+      url.pathname && url.pathname !== '/'
+        ? url.pathname.replace(/\/$/, '')
+        : '/';
+    return { baseUrl: value, path: normalizedPath.length > 0 ? normalizedPath : '/' };
+  } catch {
+    return { baseUrl: value, path: '/collab' };
+  }
+};
+
 export const config = {
   nodeEnv: env.NODE_ENV,
   http: {
@@ -53,7 +66,5 @@ export const config = {
   session: {
     gracePeriodMs: parsePositiveNumber(env.SESSION_GRACE_PERIOD_SECONDS, 300) * 1000,
   },
-  websocket: {
-    baseUrl: env.COLLAB_WS_BASE_URL,
-  },
+  websocket: parseWebsocketConfig(env.COLLAB_WS_BASE_URL),
 };
