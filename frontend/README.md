@@ -22,6 +22,7 @@ The app runs on `http://localhost:3000` by default.
 ## Key Folders
 
 - `app/` – App Router routes (`page.tsx`, `login/page.tsx`, `register/page.tsx`, `verify-email/page.tsx`, `verify-success/page.tsx`, `dashboard/page.tsx`) plus layout/providers.
+- `app/session/[sessionId]/page.tsx` – Collaboration coding surface (question panel + Monaco editor scaffold, presently using mock data).
 - `context/AuthContext.tsx` – Stores session state, hydrates from `localStorage`, and fetches `/auth/me` when a token is present.
 - `hooks/` – `useAuth` for consuming the context and `useRequireAuth` for guarding routes.
 - `lib/api-client.ts` – Typed fetch wrapper for all user-service endpoints.
