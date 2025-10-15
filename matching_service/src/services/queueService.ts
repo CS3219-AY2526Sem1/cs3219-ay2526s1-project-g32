@@ -24,7 +24,7 @@ class QueueService {
    */
   public async addToQueue(entry: QueueEntry, topic: string): Promise<void> {
     const queueKey = getQueueKey(topic);
-    // LPUSH adds the new entry to the end of the list (right side).
+    // rPUSH adds the new entry to the end of the list (right side).
     await redisClient.rPush(queueKey, JSON.stringify(entry));
     console.log(`User ${entry.userId} added to queue for topic: ${topic}`);
   }
