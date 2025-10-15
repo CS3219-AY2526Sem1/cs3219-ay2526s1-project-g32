@@ -3,6 +3,7 @@ import { queueService, QueueEntry } from '../services/queueService';
 import { timeoutService } from '../services/timeoutService';
 import redisClient from '../redisClient';
 import axios from 'axios';
+import { CreateMatchRequest, DeleteMatchRequest } from '../validation/matchingSchemas';
 
 // --- Inter-Service Communication ---
 const COLLABORATION_SERVICE_URL = process.env.COLLABORATION_SERVICE_URL || 'http://localhost:3001/api/v1/collaborations';
@@ -44,16 +45,8 @@ async function createCollaborationSession(user1Id: string, user2Id: string, diff
 
 export const createMatchRequest = async (req: Request, res: Response) => {
   try {
-    // Get userId from request body since we're not using authentication
-    const { userId, difficulty, topic } = req.body;
-
-    if (!userId) {
-      return res.status(400).json({ message: 'Missing required field: userId.' });
-    }
-    
-    if (!difficulty || !topic) {
-      return res.status(400).json({ message: 'Missing required fields: difficulty, topic.' });
-    }
+    // Data is already validated by middleware, so we can safely destructure
+    const { userId, difficulty, topic }: CreateMatchRequest = req.body;
 
     console.log(`[Controller] Received match request from ${userId} for topic "${topic}" with difficulty "${difficulty}".`);
     await redisClient.set(`match_status:${userId}`, 'pending');
@@ -85,16 +78,8 @@ export const createMatchRequest = async (req: Request, res: Response) => {
 
 export const deleteMatchRequest = async (req: Request, res: Response) => {
     try {
-        // Get userId and topic from request body since we're not using authentication
-        const { userId, topic } = req.body;
-
-        if (!userId) {
-            return res.status(400).json({ message: 'Missing required field: userId.' });
-        }
-        
-        if (!topic) {
-            return res.status(400).json({ message: 'Missing required field: topic.' });
-        }
+        // Data is already validated by middleware
+        const { userId, topic }: DeleteMatchRequest = req.body;
 
         console.log(`[Controller] Received cancellation request from ${userId} for topic "${topic}".`);
         await queueService.removeFromQueue(userId, topic);
@@ -111,16 +96,12 @@ export const deleteMatchRequest = async (req: Request, res: Response) => {
 
 /**
  * Gets the status of a user's match request for polling.
- * The userId is taken from the URL parameter.
+ * The userId is taken from the URL parameter and validated by middleware.
  */
 export const getMatchStatus = async (req: Request, res: Response) => {
     try {
-        // The user ID comes from the URL params
+        // userId is already validated by middleware
         const { userId } = req.params;
-        
-        if (!userId) {
-            return res.status(400).json({ message: 'Missing required parameter: userId.' });
-        }
 
         const status = await redisClient.get(`match_status:${userId}`);
         
