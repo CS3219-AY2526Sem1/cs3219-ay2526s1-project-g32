@@ -38,6 +38,8 @@ The app runs on `http://localhost:3000` by default.
 | --- | --- |
 | `NEXT_PUBLIC_USER_SERVICE_URL` | Base URL for the user service (`http://localhost:4001/api/v1` by default). |
 | `NEXT_PUBLIC_VERIFY_REDIRECT` | URL embedded in Supabase magic-link emails (`http://localhost:3000/verify-success`). |
+| `NEXT_PUBLIC_COLLAB_SERVICE_URL` | Collaboration service REST base (`http://localhost:4010/api/v1`). |
+| `NEXT_PUBLIC_COLLAB_WS_URL` | Collaboration WebSocket endpoint (`ws://localhost:4010/collab`). |
 
 ## Flow Overview
 

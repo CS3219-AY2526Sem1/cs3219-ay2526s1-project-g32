@@ -1,8 +1,12 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Monaco } from '@monaco-editor/react';
+import { MonacoBinding } from 'y-monaco';
+import { WebsocketProvider } from 'y-websocket';
+import * as Y from 'yjs';
+import type { editor as MonacoEditorNS } from 'monaco-editor';
 import {
   Avatar,
   Badge,
@@ -11,22 +15,30 @@ import {
   Divider,
   Layout,
   List,
+  Result,
+  Skeleton,
   Space,
+  Spin,
   Tag,
   Typography,
 } from 'antd';
 import {
   ArrowRightOutlined,
+  LinkOutlined,
   UserOutlined,
 } from '@ant-design/icons';
+
+import { useAuth } from '../../../hooks/useAuth';
+import {
+  fetchSession,
+  requestSessionToken,
+  type SessionSnapshot,
+} from '../../../lib/collab-client';
 
 const { Header, Content } = Layout;
 const { Title, Paragraph, Text } = Typography;
 
-const MonacoEditor = dynamic(
-  () => import('@monaco-editor/react'),
-  { ssr: false },
-);
+const MonacoEditor = dynamic(() => import('@monaco-editor/react'), { ssr: false });
 
 type SessionPageProps = {
   params: {
@@ -34,94 +46,313 @@ type SessionPageProps = {
   };
 };
 
-type ParticipantStub = {
-  userId: string;
-  displayName: string;
-  status: 'connected' | 'connecting' | 'disconnected';
+type ConnectionStatus = 'connected' | 'connecting' | 'disconnected';
+
+const difficultyColor: Record<'easy' | 'medium' | 'hard', string> = {
+  easy: 'green',
+  medium: 'gold',
+  hard: 'red',
 };
 
-type QuestionStub = {
-  title: string;
-  difficulty: 'Easy' | 'Medium' | 'Hard';
-  topics: string[];
-  description: string;
-  constraints: string[];
-  examples: Array<{
-    input: string;
-    output: string;
-    explanation?: string;
-  }>;
-};
-
-const mockParticipants: ParticipantStub[] = [
-  { userId: 'u-1', displayName: 'Alice Tan', status: 'connected' },
-  { userId: 'u-2', displayName: 'Wei Xuan', status: 'connected' },
-];
-
-const mockQuestion: QuestionStub = {
-  title: 'Binary Tree Level Order Traversal',
-  difficulty: 'Medium',
-  topics: ['Tree', 'Breadth-First Search'],
-  description:
-    'Given the root of a binary tree, return the level order traversal of its nodes\' values. (i.e., from left to right, level by level).',
-  constraints: [
-    'The number of nodes in the tree is in the range [0, 2000].',
-    '-1000 <= Node.val <= 1000',
-  ],
-  examples: [
-    {
-      input: 'root = [3,9,20,null,null,15,7]',
-      output: '[[3],[9,20],[15,7]]',
-      explanation:
-        'Nodes are visited level by level. Values on the same depth share the same inner array.',
-    },
-    {
-      input: 'root = [1]',
-      output: '[[1]]',
-    },
-    {
-      input: 'root = []',
-      output: '[]',
-    },
-  ],
-};
-
-const difficultyColor: Record<QuestionStub['difficulty'], string> = {
-  Easy: 'green',
-  Medium: 'gold',
-  Hard: 'red',
-};
-
-const defaultEditorCode = `function levelOrder(root) {
-  if (!root) return [];
-  const queue = [root];
-  const result = [];
-
-  while (queue.length) {
-    const size = queue.length;
-    const level = [];
-
-    for (let i = 0; i < size; i += 1) {
-      const node = queue.shift();
-      level.push(node.val);
-      if (node.left) queue.push(node.left);
-      if (node.right) queue.push(node.right);
-    }
-
-    result.push(level);
-  }
-
-  return result;
-}
-`;
+const wsBaseUrl =
+  (process.env.NEXT_PUBLIC_COLLAB_WS_URL ?? 'ws://localhost:4010/collab').replace(/\/$/, '');
 
 export default function SessionPage({ params }: SessionPageProps) {
-  const [language, setLanguage] = useState<'javascript' | 'typescript'>('javascript');
+  const { user, session: authSession, isAuthenticated, isReady: authReady } = useAuth();
 
-  const sessionTitle = useMemo(
-    () => `Session ${params.sessionId.slice(0, 8).toUpperCase()}`,
-    [params.sessionId],
-  );
+  const [sessionSnapshot, setSessionSnapshot] = useState<SessionSnapshot | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [sessionToken, setSessionToken] = useState<string | null>(null);
+  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('connecting');
+  const [language, setLanguage] = useState<string>('javascript');
+
+  const ydoc = useMemo(() => new Y.Doc(), [params.sessionId]);
+  const yText = useMemo(() => ydoc.getText('monaco'), [ydoc]);
+
+  const editorRef = useRef<MonacoEditorNS.IStandaloneCodeEditor | null>(null);
+  const monacoRef = useRef<Monaco | null>(null);
+  const bindingRef = useRef<MonacoBinding | null>(null);
+  const providerRef = useRef<WebsocketProvider | null>(null);
+  const initializedRef = useRef(false);
+
+  useEffect(() => () => ydoc.destroy(), [ydoc]);
+
+  useEffect(() => {
+    initializedRef.current = false;
+  }, [params.sessionId]);
+
+  useEffect(() => {
+    initializedRef.current = false;
+  }, [params.sessionId]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const bootstrap = async () => {
+      if (!authReady || !isAuthenticated || !authSession?.accessToken || !user?.id) {
+        return;
+      }
+
+      setLoading(true);
+      setError(null);
+
+      try {
+        const session = await fetchSession(params.sessionId);
+        if (cancelled) return;
+        setSessionSnapshot(session);
+
+        const defaultLanguage =
+          Object.keys(session.question.starterCode ?? {}).find(Boolean) ?? 'javascript';
+        setLanguage((prev) =>
+          (session.question.starterCode && session.question.starterCode[prev] !== undefined)
+            ? prev
+            : defaultLanguage,
+        );
+
+        const { sessionToken: token } = await requestSessionToken(params.sessionId, {
+          userId: user.id,
+          accessToken: authSession.accessToken,
+        });
+
+        if (cancelled) return;
+        setSessionToken(token);
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : 'Failed to load session');
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    };
+
+    void bootstrap();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    authReady,
+    isAuthenticated,
+    authSession?.accessToken,
+    params.sessionId,
+    user?.id,
+  ]);
+
+  useEffect(() => {
+    if (!sessionSnapshot || !sessionToken || !user) {
+      return;
+    }
+
+    const provider = new WebsocketProvider(wsBaseUrl, sessionSnapshot.sessionId, ydoc, {
+      params: {
+        token: sessionToken,
+      },
+    });
+
+    providerRef.current = provider;
+    setConnectionStatus(provider.wsconnected ? 'connected' : 'connecting');
+
+    const displayName =
+      sessionSnapshot.participants.find((participant) => participant.userId === user.id)?.displayName ??
+      (typeof user.userMetadata?.username === 'string'
+        ? (user.userMetadata.username as string)
+        : user.email ?? user.id);
+
+    provider.awareness.setLocalStateField('user', {
+      name: displayName,
+    });
+
+    const handleStatus = (event: { status: ConnectionStatus }) => {
+      setConnectionStatus(event.status);
+    };
+
+    provider.on('status', handleStatus);
+
+    return () => {
+      provider.off('status', handleStatus);
+      provider.destroy();
+      providerRef.current = null;
+    };
+  }, [sessionSnapshot, sessionToken, user, ydoc]);
+
+  useEffect(() => {
+    const editor = editorRef.current;
+    const provider = providerRef.current;
+
+    if (!sessionSnapshot || !editor || !provider) {
+      return;
+    }
+
+    const model = editor.getModel();
+    if (!model) {
+      return;
+    }
+
+    bindingRef.current?.destroy();
+    bindingRef.current = new MonacoBinding(yText, model, new Set([editor]), provider.awareness);
+
+    return () => {
+      bindingRef.current?.destroy();
+      bindingRef.current = null;
+    };
+  }, [sessionSnapshot, yText]);
+
+  useEffect(() => {
+    if (!sessionSnapshot) {
+      return;
+    }
+
+    const initialCode = sessionSnapshot.question.starterCode?.[language];
+
+    if (!initializedRef.current && typeof initialCode === 'string' && yText.length === 0) {
+      yText.insert(0, initialCode);
+      initializedRef.current = true;
+    }
+  }, [language, sessionSnapshot, yText]);
+
+  const handleEditorMount = (editor: MonacoEditorNS.IStandaloneCodeEditor, monaco: Monaco) => {
+    editorRef.current = editor;
+    monacoRef.current = monaco;
+
+    setTimeout(() => editor.layout(), 0);
+    const model = editor.getModel();
+    if (!model) {
+      return;
+    }
+
+    monaco.editor.setModelLanguage(model, language);
+
+    const provider = providerRef.current;
+    if (provider) {
+      bindingRef.current?.destroy();
+      bindingRef.current = new MonacoBinding(yText, model, new Set([editor]), provider.awareness);
+    }
+  };
+
+  useEffect(() => {
+    const editor = editorRef.current;
+    const monaco = monacoRef.current;
+    if (!editor || !monaco) {
+      return;
+    }
+
+    const model = editor.getModel();
+    if (model) {
+      monaco.editor.setModelLanguage(model, language);
+    }
+  }, [language]);
+
+  const participantBanner = useMemo(() => {
+    if (!sessionSnapshot) return null;
+
+    return (
+      <Space size="large">
+        {sessionSnapshot.participants.map((participant) => (
+          <Badge
+            key={participant.userId}
+            status={participant.connected ? 'success' : 'default'}
+            text={
+              <Space size="small">
+                <Avatar size="small" icon={<UserOutlined />} />
+                <Text>
+                  {participant.displayName ?? participant.userId}
+                </Text>
+              </Space>
+            }
+          />
+        ))}
+      </Space>
+    );
+  }, [sessionSnapshot]);
+
+  const questionMetadata = useMemo(() => {
+    const question = sessionSnapshot?.question;
+    if (!question) return null;
+
+    const difficulty = question.metadata.difficulty as 'easy' | 'medium' | 'hard';
+    const badgeColor = difficultyColor[difficulty] ?? 'default';
+    const topics = question.metadata.topics ?? [];
+    const starterCodeEntries = Object.entries(question.starterCode ?? {}) as Array<[string, string]>;
+
+    return (
+      <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+        <Space align="baseline" size="middle">
+          <Title level={3} style={{ margin: 0 }}>
+            {question.title}
+          </Title>
+          <Tag color={badgeColor}>{difficulty.toUpperCase()}</Tag>
+        </Space>
+        <Space wrap>
+          {topics.map((topic: string) => (
+            <Tag key={topic}>{topic}</Tag>
+          ))}
+        </Space>
+        <Divider style={{ margin: '12px 0' }} />
+        <div>
+          <Title level={5}>Description</Title>
+          <Paragraph style={{ whiteSpace: 'pre-line' }}>
+            {question.prompt}
+          </Paragraph>
+        </div>
+        <div>
+          <Title level={5}>Starter Code</Title>
+          <List
+            size="small"
+            dataSource={starterCodeEntries}
+            renderItem={([lang, code]: [string, string]) => (
+              <List.Item style={{ paddingInline: 0 }}>
+                <Space>
+                  <Tag>{lang}</Tag>
+                  <Text type="secondary">
+                    {code.slice(0, 48)}
+                    {code.length > 48 ? '…' : ''}
+                  </Text>
+                </Space>
+              </List.Item>
+            )}
+          />
+        </div>
+      </Space>
+    );
+  }, [sessionSnapshot]);
+
+  if (!authReady || (authReady && !isAuthenticated)) {
+    return (
+      <Result
+        status="403"
+        title="Please sign in"
+        subTitle="An authenticated account is required to join collaboration sessions."
+      />
+    );
+  }
+
+  if (loading) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <Spin tip="Preparing your session…" size="large" />
+      </div>
+    );
+  }
+
+  if (error || !sessionSnapshot) {
+    return (
+      <Result
+        status="error"
+        title="Unable to load session"
+        subTitle={error ?? 'Unknown error'}
+        extra={
+          <Button type="primary" href="/dashboard">
+            Back to dashboard
+          </Button>
+        }
+      />
+    );
+  }
+
+  const sessionTitle = `Session ${sessionSnapshot.sessionId.slice(0, 8).toUpperCase()}`;
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
@@ -140,24 +371,16 @@ export default function SessionPage({ params }: SessionPageProps) {
           <Text type="secondary" style={{ textTransform: 'uppercase', letterSpacing: 1 }}>
             Active Collaboration
           </Text>
-          <Title level={4} style={{ margin: 0 }}>
-            {sessionTitle}
-          </Title>
+          <Space size="middle">
+            <Title level={4} style={{ margin: 0 }}>
+              {sessionTitle}
+            </Title>
+            <Tag icon={<LinkOutlined />} color={connectionStatus === 'connected' ? 'green' : connectionStatus === 'connecting' ? 'gold' : 'default'}>
+              {connectionStatus.toUpperCase()}
+            </Tag>
+          </Space>
         </Space>
-        <Space size="large">
-          {mockParticipants.map((participant) => (
-            <Badge
-              key={participant.userId}
-              status={participant.status === 'connected' ? 'success' : participant.status === 'connecting' ? 'processing' : 'default'}
-              text={
-                <Space size="small">
-                  <Avatar size="small" icon={<UserOutlined />} />
-                  <Text>{participant.displayName}</Text>
-                </Space>
-              }
-            />
-          ))}
-        </Space>
+        {participantBanner}
       </Header>
       <Content style={{ padding: '24px 32px' }}>
         <div
@@ -172,73 +395,11 @@ export default function SessionPage({ params }: SessionPageProps) {
             style={{ boxShadow: '0 12px 40px rgba(0,0,0,0.06)' }}
             bodyStyle={{ padding: 24 }}
           >
-            <Space direction="vertical" size="middle" style={{ width: '100%' }}>
-              <Space align="baseline" size="middle">
-                <Title level={3} style={{ margin: 0 }}>
-                  {mockQuestion.title}
-                </Title>
-                <Tag color={difficultyColor[mockQuestion.difficulty]}>{mockQuestion.difficulty}</Tag>
-              </Space>
-              <Space wrap>
-                {mockQuestion.topics.map((topic) => (
-                  <Tag key={topic}>{topic}</Tag>
-                ))}
-              </Space>
-              <Divider style={{ margin: '12px 0' }} />
-              <div>
-                <Title level={5}>Description</Title>
-                <Paragraph style={{ whiteSpace: 'pre-line' }}>{mockQuestion.description}</Paragraph>
-              </div>
-              <div>
-                <Title level={5}>Constraints</Title>
-                <List
-                  size="small"
-                  dataSource={mockQuestion.constraints}
-                  renderItem={(item) => (
-                    <List.Item style={{ paddingInline: 0 }}>
-                      <Text>- {item}</Text>
-                    </List.Item>
-                  )}
-                />
-              </div>
-              <div>
-                <Title level={5}>Examples</Title>
-                <Space direction="vertical" size="middle" style={{ width: '100%' }}>
-                  {mockQuestion.examples.map((example, index) => (
-                    <Card
-                      key={index}
-                      size="small"
-                      style={{ background: '#fafafa' }}
-                      bodyStyle={{ padding: 16 }}
-                    >
-                      <Space direction="vertical" size="small" style={{ width: '100%' }}>
-                        <Text strong>Input:</Text>
-                        <Paragraph
-                          copyable
-                          style={{ fontFamily: 'monospace', marginBottom: 8 }}
-                        >
-                          {example.input}
-                        </Paragraph>
-                        <Text strong>Output:</Text>
-                        <Paragraph
-                          style={{ fontFamily: 'monospace', marginBottom: 8 }}
-                        >
-                          {example.output}
-                        </Paragraph>
-                        {example.explanation ? (
-                          <>
-                            <Text strong>Explanation:</Text>
-                            <Paragraph style={{ marginBottom: 0 }}>
-                              {example.explanation}
-                            </Paragraph>
-                          </>
-                        ) : null}
-                      </Space>
-                    </Card>
-                  ))}
-                </Space>
-              </div>
-            </Space>
+            {loading ? (
+              <Skeleton active paragraph={{ rows: 10 }} />
+            ) : (
+              questionMetadata
+            )}
           </Card>
           <Card
             bordered={false}
@@ -255,15 +416,22 @@ export default function SessionPage({ params }: SessionPageProps) {
               }}
             >
               <Space>
-                <Tag>{language === 'javascript' ? 'JavaScript' : 'TypeScript'}</Tag>
-                <Button
-                  size="small"
-                  onClick={() =>
-                    setLanguage((prev) => (prev === 'javascript' ? 'typescript' : 'javascript'))
-                  }
-                >
-                  Switch to {language === 'javascript' ? 'TypeScript' : 'JavaScript'}
-                </Button>
+                <Tag>{language}</Tag>
+                <Space.Compact>
+                  {(sessionSnapshot.question.starterCode
+                    ? Object.keys(sessionSnapshot.question.starterCode)
+                    : ['javascript']
+                  ).map((lang) => (
+                    <Button
+                      key={lang}
+                      size="small"
+                      type={lang === language ? 'primary' : 'default'}
+                      onClick={() => setLanguage(lang)}
+                    >
+                      {lang}
+                    </Button>
+                  ))}
+                </Space.Compact>
               </Space>
               <Button type="primary" icon={<ArrowRightOutlined />}>
                 Ready to Submit
@@ -272,8 +440,7 @@ export default function SessionPage({ params }: SessionPageProps) {
             <div style={{ flex: 1, minHeight: 480 }}>
               <MonacoEditor
                 height="100%"
-                language={language}
-                defaultValue={defaultEditorCode}
+                defaultLanguage="javascript"
                 theme="vs-dark"
                 options={{
                   fontSize: 14,
@@ -281,10 +448,9 @@ export default function SessionPage({ params }: SessionPageProps) {
                   scrollBeyondLastLine: false,
                   lineNumbers: 'on',
                 }}
-                onMount={(editor, monaco: Monaco) => {
-                  // Fit editor layout on mount; future collaborative binding goes here.
-                  setTimeout(() => editor.layout(), 0);
-                  monaco.editor.setModelLanguage(editor.getModel()!, language);
+                onMount={handleEditorMount}
+                onChange={() => {
+                  // No-op: Yjs binding already syncs content; change handler allows React 18 strict mode compatibility.
                 }}
               />
             </div>
