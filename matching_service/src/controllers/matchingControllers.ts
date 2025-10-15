@@ -3,7 +3,6 @@ import { queueService, QueueEntry } from '../services/queueService';
 import { timeoutService } from '../services/timeoutService';
 import redisClient from '../redisClient';
 import axios from 'axios';
-import { AuthenticatedRequest } from '../middleware/authMiddleware';
 
 // --- Inter-Service Communication ---
 const COLLABORATION_SERVICE_URL = process.env.COLLABORATION_SERVICE_URL || 'http://localhost:3001/api/v1/collaborations';
@@ -43,13 +42,13 @@ async function createCollaborationSession(user1Id: string, user2Id: string, diff
 
 // --- Controller Functions ---
 
-export const createMatchRequest = async (req: AuthenticatedRequest, res: Response) => {
+export const createMatchRequest = async (req: Request, res: Response) => {
   try {
-    const userId = req.user?.id;
-    const { difficulty, topic } = req.body;
+    // Get userId from request body since we're not using authentication
+    const { userId, difficulty, topic } = req.body;
 
     if (!userId) {
-      return res.status(401).json({ message: 'Authentication failed: User ID not found in token.' });
+      return res.status(400).json({ message: 'Missing required field: userId.' });
     }
     
     if (!difficulty || !topic) {
@@ -84,13 +83,13 @@ export const createMatchRequest = async (req: AuthenticatedRequest, res: Respons
   }
 };
 
-export const deleteMatchRequest = async (req: AuthenticatedRequest, res: Response) => {
+export const deleteMatchRequest = async (req: Request, res: Response) => {
     try {
-        const userId = req.user?.id;
-        const { topic } = req.body;
+        // Get userId and topic from request body since we're not using authentication
+        const { userId, topic } = req.body;
 
         if (!userId) {
-            return res.status(401).json({ message: 'Authentication failed: User ID not found in token.' });
+            return res.status(400).json({ message: 'Missing required field: userId.' });
         }
         
         if (!topic) {
@@ -114,14 +113,13 @@ export const deleteMatchRequest = async (req: AuthenticatedRequest, res: Respons
  * Gets the status of a user's match request for polling.
  * The userId is taken from the URL parameter.
  */
-export const getMatchStatus = async (req: AuthenticatedRequest, res: Response) => {
+export const getMatchStatus = async (req: Request, res: Response) => {
     try {
-        // The user ID should come from the URL params for this specific route.
+        // The user ID comes from the URL params
         const { userId } = req.params;
         
-        // Security check: Ensure the authenticated user is only checking their own status.
-        if (req.user?.id !== userId) {
-            return res.status(403).json({ message: 'Forbidden: You can only check your own match status.' });
+        if (!userId) {
+            return res.status(400).json({ message: 'Missing required parameter: userId.' });
         }
 
         const status = await redisClient.get(`match_status:${userId}`);
@@ -137,11 +135,11 @@ export const getMatchStatus = async (req: AuthenticatedRequest, res: Response) =
 
 /**
  * Handles re-queuing a user from the Collaboration Service.
- * This is an internal-facing endpoint but is still protected.
+ * This is an internal-facing endpoint.
  */
-export const handleRequeue = async (req: AuthenticatedRequest, res: Response) => {
+export const handleRequeue = async (req: Request, res: Response) => {
     try {
-        // For internal service calls, we might trust the body, but auth is still good practice.
+        // Get required fields from request body
         const { userId, difficulty, topic } = req.body;
         if (!userId || !difficulty || !topic) {
             return res.status(400).json({ message: 'Missing required fields: userId, difficulty, topic.' });
