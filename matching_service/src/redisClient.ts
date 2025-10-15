@@ -20,9 +20,10 @@ redisClient.on('error', (err) => {
 // before any other part of the app tries to use the client.
 (async () => {
   await redisClient.connect();
+  console.log('Successfully connected to Redis.');
 })();
 
-console.log('Successfully connected to Redis.');
+
 
 // Export the connected client instance.
 export default redisClient;
