@@ -90,17 +90,42 @@ class TimeoutService {
           const status = await redisClient.get(`match_status:${userId}`);
 
           if (status === 'pending') {
-            console.log(`[TimeoutService] User ${userId} is still pending. Removing from all queues.`);
+            console.log(`[TimeoutService] User ${userId} is still pending. Removing from all queues using SCAN.`);
             
-            // Note: We don't know the topic here, so we must remove them from all possible queues.
-            // This is a tradeoff of this design. A more complex design might include the topic in the message.
-            const queueKeys = await redisClient.keys('match_queue:*');
-            for (const key of queueKeys) {
-                await redisClient.lRem(key, 0, entryString); // 0 means remove all matching elements
+            // Use SCAN instead of KEYS to avoid blocking Redis
+            // Note: This is still inefficient as we have to check all queues.
+            // A better approach would be to include the topic in the timeout message.
+            let cursor = 0;
+            let removedCount = 0;
+            
+            do {
+              const scanResult = await redisClient.scan(cursor, {
+                MATCH: 'match_queue:*',
+                COUNT: 100
+              });
+              
+              cursor = scanResult.cursor;
+              const keys = scanResult.keys;
+              
+              for (const key of keys) {
+                try {
+                  const removeCount = await redisClient.lRem(key, 0, entryString);
+                  if (removeCount > 0) {
+                    removedCount += removeCount;
+                    console.log(`[TimeoutService] Removed ${removeCount} entries for user ${userId} from queue "${key}".`);
+                  }
+                } catch (error) {
+                  console.error(`[TimeoutService] Error removing from queue ${key}:`, error);
+                }
+              }
+            } while (cursor !== 0);
+            
+            if (removedCount === 0) {
+              console.log(`[TimeoutService] No entries found for user ${userId} in any queue.`);
             }
             
             await redisClient.del(`match_status:${userId}`);
-            console.log(`[TimeoutService] Cleaned up expired user ${userId}.`);
+            console.log(`[TimeoutService] Cleaned up expired user ${userId}. Total entries removed: ${removedCount}.`);
           } else {
             console.log(`[TimeoutService] User ${userId} is no longer pending. No action taken.`);
           }

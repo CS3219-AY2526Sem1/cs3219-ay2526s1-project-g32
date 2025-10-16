@@ -66,7 +66,7 @@ export const createMatchRequest = async (req: Request, res: Response) => {
       console.log(`[Controller] No match found for ${userId}. Adding to queue.`);
       const newEntry: QueueEntry = { userId, difficulty, timestamp: Date.now() };
       await queueService.addToQueue(newEntry, topic);
-      timeoutService.scheduleTimeoutCheck(newEntry);
+      timeoutService.scheduleTimeoutCheck(newEntry, topic);
       return res.status(202).json({ status: 'pending', message: 'No match found at this time. You have been added to the queue.' });
     }
   } catch (error: any) {

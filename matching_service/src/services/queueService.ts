@@ -93,26 +93,82 @@ class QueueService {
   }
 
   /**
-   * Retrieves all entries from all queues. Used by the timeout service.
-   * NOTE: This can be inefficient with a very large number of queues.
-   * In a large-scale system, a different pattern might be used for timeouts.
+   * Retrieves all entries from all queues using SCAN for safe iteration.
+   * WARNING: This method can be expensive and should be used sparingly in production.
+   * Consider if you really need all entries or if there's a more targeted approach.
+   * 
+   * @param limit - Maximum number of entries to return (default: 1000)
    * @returns An array of all queue entries with their topic.
    */
-   public async getAllQueueEntries(): Promise<{ entry: QueueEntry; topic: string }[]> {
+   public async getAllQueueEntries(limit: number = 1000): Promise<{ entry: QueueEntry; topic: string }[]> {
     const allEntries: { entry: QueueEntry; topic: string }[] = [];
-    const keys = await redisClient.keys('match_queue:*'); // Find all queue keys
+    let cursor = 0;
+    let totalCollected = 0;
 
-    for (const key of keys) {
-      const topic = key.split(':')[1];
-      const entriesString = await redisClient.lRange(key, 0, -1);
-      for (const entryString of entriesString) {
-        allEntries.push({
-            entry: JSON.parse(entryString),
-            topic: topic
-        });
+    // Use SCAN instead of KEYS for production safety
+    do {
+      const scanResult = await redisClient.scan(cursor, {
+        MATCH: 'match_queue:*',
+        COUNT: 100 // Process in batches of 100
+      });
+      
+      cursor = scanResult.cursor;
+      const keys = scanResult.keys;
+
+      for (const key of keys) {
+        if (totalCollected >= limit) {
+          console.log(`[QueueService] Reached limit of ${limit} entries, stopping scan.`);
+          return allEntries;
+        }
+
+        const topic = key.split(':')[1];
+        if (!topic) continue;
+
+        try {
+          const entriesString = await redisClient.lRange(key, 0, -1);
+          for (const entryString of entriesString) {
+            if (totalCollected >= limit) break;
+            
+            allEntries.push({
+              entry: JSON.parse(entryString),
+              topic: topic
+            });
+            totalCollected++;
+          }
+        } catch (error) {
+          console.error(`[QueueService] Error processing queue ${key}:`, error);
+          // Continue with other queues even if one fails
+        }
       }
-    }
+    } while (cursor !== 0 && totalCollected < limit);
+
+    console.log(`[QueueService] Retrieved ${totalCollected} queue entries across all topics.`);
     return allEntries;
+  }
+
+  /**
+   * Gets the length of a specific topic queue.
+   * This is much more efficient than getAllQueueEntries for monitoring.
+   * @param topic - The topic to check queue length for.
+   * @returns The number of users waiting in the queue for this topic.
+   */
+  public async getQueueLength(topic: string): Promise<number> {
+    const queueKey = getQueueKey(topic);
+    return await redisClient.lLen(queueKey);
+  }
+
+  /**
+   * Gets entries for a specific topic queue.
+   * More efficient than getAllQueueEntries when you know the topic.
+   * @param topic - The topic to get entries for.
+   * @param start - Start index (default: 0).
+   * @param end - End index (default: -1 for all).
+   * @returns Array of queue entries for the specified topic.
+   */
+  public async getQueueEntries(topic: string, start: number = 0, end: number = -1): Promise<QueueEntry[]> {
+    const queueKey = getQueueKey(topic);
+    const entriesString = await redisClient.lRange(queueKey, start, end);
+    return entriesString.map(entryString => JSON.parse(entryString));
   }
 }
 
