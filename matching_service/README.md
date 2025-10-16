@@ -10,11 +10,13 @@ The Matching Service is designed as a standalone microservice that interacts wit
 
 - **Web Server (Express.js)**: Provides a versioned RESTful API for clients to interact with the service.
 
-- **Queue Management (Redis)**: Uses Redis Lists to maintain a separate FIFO (First-In-First-Out) queue for each question topic. This ensures that matching is both fast and fair.
+- **Queue Management (Redis)**: Uses Redis Lists to maintain a separate FIFO (First-In-First-Out) queue for each question topic. This ensures that matching is both fast and fair. Optimized with SCAN operations for production-safe performance.
 
 - **Timeout Handling (RabbitMQ)**: Implements an event-driven timeout system using a Time-To-Live (TTL) and Dead-Letter Exchange pattern in RabbitMQ. This is highly efficient and avoids the need for constant database polling.
 
-- **Authentication Middleware**: JWT-based authentication system that validates tokens with the User Service to ensure secure access to all endpoints.
+- **Input Validation (Zod)**: Comprehensive schema validation using Zod library ensures type-safe request handling and proper error responses for invalid inputs.
+
+- **Authentication Integration**: Integrates with User Service for JWT token validation, providing secure access control while delegating all authentication logic to the centralized user service.
 
 - **Controller/Service Pattern**: The code is structured to separate API routing and request handling (Controllers) from the core business logic (Services), making the application clean and maintainable.
 
@@ -34,8 +36,10 @@ The Matching Service is designed as a standalone microservice that interacts wit
 - **Instant Matching**: When a suitable partner is found immediately, creates a collaboration session instantly.
 
 ### Security & Reliability
-- **JWT Authentication**: All endpoints require valid JWT tokens validated against the User Service.
-- **User Isolation**: Users can only access their own match status and data.
+- **JWT Authentication**: Secure token validation through User Service integration with simple boolean response checking.
+- **Input Validation**: Comprehensive request validation using Zod schemas with proper error messages.
+- **User Isolation**: Users can only access their own match data through authenticated endpoints.
+- **Type Safety**: TypeScript and Zod ensure type-safe operations throughout the service.
 - **Service Communication**: Integrates with Collaboration Service to create coding sessions.
 - **Error Recovery**: Automatically re-queues both users if collaboration session creation fails.
 - **Graceful Degradation**: Handles downstream service failures appropriately.
@@ -56,12 +60,15 @@ matching_service/
 │   ├── controllers/
 │   │   └── matchingControllers.ts  # Request handlers & business logic
 │   ├── middleware/
-│   │   └── authMiddleware.ts       # JWT authentication middleware
+│   │   ├── authenticate.ts        # JWT authentication via User Service
+│   │   └── validateRequest.ts      # Zod schema validation middleware
 │   ├── routes/
 │   │   └── matching.ts            # API route definitions
-│   └── services/
-│       ├── queueService.ts        # Redis queue management
-│       └── timeoutService.ts      # RabbitMQ timeout handling
+│   ├── services/
+│   │   ├── queueService.ts        # Redis queue management
+│   │   └── timeoutService.ts      # RabbitMQ timeout handling
+│   └── validation/
+│       └── matchingSchemas.ts     # Zod validation schemas
 ├── .env                           # Environment configuration
 ├── package.json                   # Dependencies & scripts
 ├── tsconfig.json                  # TypeScript configuration
@@ -72,13 +79,16 @@ matching_service/
 ```typescript
 interface QueueEntry {
   userId: string;
-  difficulty: string;    // Easy, Medium, Hard
+  difficulty: string;    // "Easy" | "Medium" | "Hard"
   timestamp: number;     // Unix timestamp
 }
 
-interface AuthenticatedRequest extends Request {
-  user?: { id: string; [key: string]: any };
-}
+// Supported Topics (validated by Zod schema)
+type Topic = "Arrays" | "Strings" | "Graphs" | "Trees" | "Dynamic Programming" | 
+             "Sorting" | "Searching" | "Recursion" | "Greedy" | "Backtracking";
+
+// Supported Difficulties (validated by Zod schema)  
+type Difficulty = "Easy" | "Medium" | "Hard";
 ```
 
 ### Queue Management
@@ -95,12 +105,12 @@ interface AuthenticatedRequest extends Request {
 
 ## API Endpoints
 
-All endpoints are prefixed with `/api/v1/matching` and **require authentication**.
+All endpoints are prefixed with `/api/v1/matching` and **require authentication** via JWT tokens validated by the User Service.
 
 ### Create Match Request
 **POST** `/requests`
 
-Adds a user to the matchmaking queue. User ID is extracted from the JWT token.
+Adds a user to the matchmaking queue. User ID is extracted from the validated JWT token.
 
 **Headers:**
 ```
@@ -115,6 +125,11 @@ Content-Type: application/json
   "topic": "Arrays"
 }
 ```
+
+**Validation Rules:**
+- `difficulty`: Must be one of "Easy", "Medium", "Hard"  
+- `topic`: Must be one of the supported topics (Arrays, Strings, Graphs, etc.)
+- Authentication token must be valid and match a user in the system
 
 **Responses:**
 
@@ -136,10 +151,23 @@ Content-Type: application/json
 }
 ```
 
-**401 Unauthorized:**
+**400 Bad Request (Validation Error):**
 ```json
 {
-  "message": "Authentication failed: No token provided."
+  "message": "Validation failed",
+  "errors": [
+    {
+      "field": "difficulty", 
+      "message": "Invalid enum value. Expected 'Easy' | 'Medium' | 'Hard', received 'easy'"
+    }
+  ]
+}
+```
+
+**401 Unauthorized (Authentication Failed):**
+```json
+{
+  "message": "Authentication failed: Invalid or expired token."
 }
 ```
 
@@ -153,6 +181,9 @@ Allows a client to poll for the current status of a user's match request. Users 
 Authorization: Bearer <jwt_token>
 ```
 
+**Parameters:**
+- `userId`: The user ID to check status for (must match the authenticated user)
+
 **Response:**
 ```json
 {
@@ -160,7 +191,12 @@ Authorization: Bearer <jwt_token>
 }
 ```
 
-**403 Forbidden:**
+**Possible status values:**
+- `"pending"` - User is waiting in queue
+- `"success"` - User has been matched
+- `"not_found"` - No active request found
+
+**403 Forbidden (Accessing Another User's Status):**
 ```json
 {
   "message": "Forbidden: You can only check your own match status."
@@ -170,7 +206,7 @@ Authorization: Bearer <jwt_token>
 ### Cancel Match Request
 **DELETE** `/requests`
 
-Removes a user from the matchmaking queue. User ID is extracted from the JWT token.
+Removes a user from the matchmaking queue. User ID is extracted from the validated JWT token.
 
 **Headers:**
 ```
@@ -185,6 +221,12 @@ Content-Type: application/json
 }
 ```
 
+**Validation Rules:**
+- `topic`: Must be one of the supported topics
+- Authentication token must be valid
+- `userId`: Required string
+- `topic`: Must be one of the supported topics
+
 **Response:** `200 OK`
 
 ### Re-queue User (Internal)
@@ -194,7 +236,6 @@ An internal endpoint for the Collaboration Service to add a user back to the fro
 
 **Headers:**
 ```
-Authorization: Bearer <jwt_token>
 Content-Type: application/json
 ```
 
@@ -216,7 +257,7 @@ Content-Type: application/json
 - Node.js (v18 or later)
 - Redis (for queue management)
 - RabbitMQ (for timeout handling)
-- User Service (for authentication)
+- User Service (for JWT authentication validation)
 
 ### Installation & Setup
 
@@ -234,7 +275,7 @@ Content-Type: application/json
    REDIS_URL="redis://localhost:6379"
    RABBITMQ_URL="amqp://localhost"
    COLLABORATION_SERVICE_URL="http://localhost:3001/api/v1/collaborations"
-   AUTH_SERVICE_URL="http://localhost:3002/api/v1/auth"
+   USER_SERVICE_URL="http://localhost:4001"
    ```
 
 ### Running the Service
@@ -315,13 +356,18 @@ curl -X POST http://localhost:3000/api/v1/matching/requests \
 
 The service implements comprehensive error handling:
 
-- **401 Unauthorized**: Invalid or missing JWT token
-- **403 Forbidden**: User trying to access other user's data
-- **400 Bad Request**: Missing required fields
+- **400 Bad Request**: Invalid input data or validation failures
+- **401 Unauthorized**: Invalid, expired, or missing JWT token
+- **403 Forbidden**: User trying to access another user's data
 - **500 Internal Server Error**: Service errors with detailed logging
-- **503 Service Unavailable**: Downstream service failures
+- **503 Service Unavailable**: Downstream service failures (User Service, Collaboration Service)
 
 ## Production Considerations
+
+### Performance
+- **Redis Optimization**: Uses SCAN operations instead of blocking KEYS commands for production safety
+- **Non-blocking Operations**: All Redis operations are designed to avoid blocking the event loop
+- **Efficient Queue Access**: Targeted queue operations with minimal Redis overhead
 
 ### Scalability
 - **Stateless Design**: Supports horizontal scaling with load balancers
@@ -331,11 +377,13 @@ The service implements comprehensive error handling:
 ### Monitoring
 - **Structured Logging**: Comprehensive logs with service prefixes
 - **Health Checks**: Root endpoint for service health verification
-- **Error Categorization**: Different error types for monitoring systems
+- **Queue Utilities**: Built-in functions for monitoring queue status and debugging
 
 ### Security
-- **JWT Validation**: Secure token verification with User Service
-- **User Isolation**: Data access control and validation
+- **JWT Authentication**: Secure token validation through User Service integration
+- **User Isolation**: Users can only access their own match data and status
+- **Input Validation**: Comprehensive request validation using Zod schemas
+- **Type Safety**: Full TypeScript coverage prevents runtime type errors
 - **Service Communication**: Authenticated inter-service communication
 
 ## Dependencies
@@ -346,6 +394,7 @@ The service implements comprehensive error handling:
 - `amqplib` - RabbitMQ client for message queuing
 - `axios` - HTTP client for service communication
 - `dotenv` - Environment variable management
+- `zod` - Runtime type validation and schema parsing
 
 ### Development Dependencies
 - `typescript` - Type safety and development tooling

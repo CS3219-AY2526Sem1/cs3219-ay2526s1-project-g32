@@ -30,10 +30,10 @@ const userIdField = z.string()
 /**
  * Schema for creating a match request
  * POST /api/v1/matching/requests
+ * Note: userId comes from authentication, not request body
  */
 export const createMatchRequestSchema = {
   body: z.object({
-    userId: userIdField,
     difficulty: difficultyEnum,
     topic: topicEnum,
   }),
@@ -42,10 +42,10 @@ export const createMatchRequestSchema = {
 /**
  * Schema for canceling a match request
  * DELETE /api/v1/matching/requests
+ * Note: userId comes from authentication, not request body
  */
 export const deleteMatchRequestSchema = {
   body: z.object({
-    userId: userIdField,
     topic: topicEnum,
   }),
 };

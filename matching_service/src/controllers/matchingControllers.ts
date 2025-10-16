@@ -4,6 +4,7 @@ import { timeoutService } from '../services/timeoutService';
 import redisClient from '../redisClient';
 import axios from 'axios';
 import { CreateMatchRequest, DeleteMatchRequest } from '../validation/matchingSchemas';
+import { AuthenticatedRequest } from '../middleware/authenticate';
 
 // --- Inter-Service Communication ---
 const COLLABORATION_SERVICE_URL = process.env.COLLABORATION_SERVICE_URL || 'http://localhost:3001/api/v1/collaborations';
@@ -43,10 +44,11 @@ async function createCollaborationSession(user1Id: string, user2Id: string, diff
 
 // --- Controller Functions ---
 
-export const createMatchRequest = async (req: Request, res: Response) => {
+export const createMatchRequest = async (req: AuthenticatedRequest, res: Response) => {
   try {
-    // Data is already validated by middleware, so we can safely destructure
-    const { userId, difficulty, topic }: CreateMatchRequest = req.body;
+    // Data is already validated by middleware, and user is authenticated
+    const { difficulty, topic }: Omit<CreateMatchRequest, 'userId'> = req.body;
+    const userId = req.user!.id; // User ID comes from authentication middleware
 
     console.log(`[Controller] Received match request from ${userId} for topic "${topic}" with difficulty "${difficulty}".`);
     await redisClient.set(`match_status:${userId}`, 'pending');
@@ -76,10 +78,11 @@ export const createMatchRequest = async (req: Request, res: Response) => {
   }
 };
 
-export const deleteMatchRequest = async (req: Request, res: Response) => {
+export const deleteMatchRequest = async (req: AuthenticatedRequest, res: Response) => {
     try {
-        // Data is already validated by middleware
-        const { userId, topic }: DeleteMatchRequest = req.body;
+        // Data is already validated by middleware, user ID comes from auth
+        const { topic }: Omit<DeleteMatchRequest, 'userId'> = req.body;
+        const userId = req.user!.id; // User ID comes from authentication middleware
 
         console.log(`[Controller] Received cancellation request from ${userId} for topic "${topic}".`);
         await queueService.removeFromQueue(userId, topic);
@@ -98,10 +101,15 @@ export const deleteMatchRequest = async (req: Request, res: Response) => {
  * Gets the status of a user's match request for polling.
  * The userId is taken from the URL parameter and validated by middleware.
  */
-export const getMatchStatus = async (req: Request, res: Response) => {
+export const getMatchStatus = async (req: AuthenticatedRequest, res: Response) => {
     try {
         // userId is already validated by middleware
         const { userId } = req.params;
+        
+        // Check if the authenticated user is trying to access their own status
+        if (req.user!.id !== userId) {
+            return res.status(403).json({ message: 'Forbidden: You can only check your own match status.' });
+        }
 
         const status = await redisClient.get(`match_status:${userId}`);
         
