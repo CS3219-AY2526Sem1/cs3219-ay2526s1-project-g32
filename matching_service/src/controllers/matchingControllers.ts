@@ -122,9 +122,6 @@ export const handleRequeue = async (req: Request, res: Response) => {
     try {
         // Get required fields from request body
         const { userId, difficulty, topic } = req.body;
-        if (!userId || !difficulty || !topic) {
-            return res.status(400).json({ message: 'Missing required fields: userId, difficulty, topic.' });
-        }
         
         console.log(`[Controller] Re-queuing user ${userId}.`);
         const entry: QueueEntry = { userId, difficulty, timestamp: Date.now() };
