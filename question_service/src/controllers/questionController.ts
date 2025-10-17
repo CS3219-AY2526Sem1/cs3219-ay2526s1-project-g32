@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
-import { Op } from "sequelize";
-import Question from "../models/Question";
+import QuestionService, { QuestionCreationAttributes } from "../models/Question";
+import supabase from "../models/db";
 
 // Define interfaces for type safety
 interface CreateQuestionBody {
@@ -38,7 +38,7 @@ interface GetRandomQuestionQuery {
 export const createQuestion = async (req: Request<{}, any, CreateQuestionBody>, res: Response): Promise<void> => {
   try {
     const { title, description, difficulty, topics, image_url } = req.body;
-    const question = await Question.create({ title, description, difficulty, topics, image_url });
+    const question = await QuestionService.create({ title, description, difficulty, topics, image_url });
     res.status(201).json(question);
   } catch (err) {
     const error = err as Error;
@@ -50,19 +50,38 @@ export const createQuestion = async (req: Request<{}, any, CreateQuestionBody>, 
 export const getQuestions = async (req: Request<{}, any, any, GetQuestionsQuery>, res: Response): Promise<void> => {
   try {
     const { title, difficulty, topic } = req.query;
-    const where: any = {};
+    
+    let query = supabase
+      .from('questions')
+      .select('*')
+      .order('created_at', { ascending: false });
 
     if (title) {
-      where.title = { [Op.iLike]: `%${title}%` };
+      query = query.ilike('title', `%${title}%`);
     }
     if (difficulty) {
-      where.difficulty = difficulty;
+      query = query.eq('difficulty', difficulty);
     }
     if (topic) {
-      where.topics = { [Op.contains]: [topic] };
+      query = query.contains('topics', [topic]);
     }
 
-    const questions = await Question.findAll({ where });
+    const { data, error } = await query;
+    
+    if (error) throw error;
+    
+    // Convert to API format
+    const questions = data?.map(row => ({
+      id: row.id,
+      title: row.title,
+      description: row.description,
+      difficulty: row.difficulty,
+      topics: row.topics,
+      image_url: row.image_url,
+      createdAt: new Date(row.created_at),
+      updatedAt: new Date(row.updated_at)
+    })) || [];
+    
     res.json(questions);
   } catch (err) {
     const error = err as Error;
@@ -73,7 +92,7 @@ export const getQuestions = async (req: Request<{}, any, any, GetQuestionsQuery>
 // Get a single question
 export const getQuestionById = async (req: Request<QuestionParams>, res: Response): Promise<void> => {
   try {
-    const question = await Question.findByPk(req.params.id);
+    const question = await QuestionService.findByPk(parseInt(req.params.id));
     if (!question) {
       res.status(404).json({ error: "Not found" });
       return;
@@ -89,17 +108,14 @@ export const getQuestionById = async (req: Request<QuestionParams>, res: Respons
 export const updateQuestion = async (req: Request<QuestionParams, any, UpdateQuestionBody>, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const [affectedRows, updatedQuestions] = await Question.update(req.body, { 
-      where: { id }, 
-      returning: true 
-    });
+    const updatedQuestion = await QuestionService.update(parseInt(id), req.body);
     
-    if (affectedRows === 0) {
+    if (!updatedQuestion) {
       res.status(404).json({ error: "Not found" });
       return;
     }
     
-    res.json(updatedQuestions[0]);
+    res.json(updatedQuestion);
   } catch (err) {
     const error = err as Error;
     res.status(500).json({ error: error.message });
@@ -110,7 +126,7 @@ export const updateQuestion = async (req: Request<QuestionParams, any, UpdateQue
 export const deleteQuestion = async (req: Request<QuestionParams>, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const deleted = await Question.destroy({ where: { id } });
+    const deleted = await QuestionService.destroy(parseInt(id));
     if (!deleted) {
       res.status(404).json({ error: "Not found" });
       return;
@@ -126,23 +142,42 @@ export const deleteQuestion = async (req: Request<QuestionParams>, res: Response
 export const getRandomQuestion = async (req: Request<{}, any, any, GetRandomQuestionQuery>, res: Response): Promise<void> => {
   try {
     const { difficulty, topic } = req.query;
-    const where: any = {};
+    
+    let query = supabase
+      .from('questions')
+      .select('*');
     
     if (difficulty) {
-      where.difficulty = difficulty;
+      query = query.eq('difficulty', difficulty);
     }
     if (topic) {
-      where.topics = { [Op.contains]: [topic] };
+      query = query.contains('topics', [topic]);
     }
 
-    const questions = await Question.findAll({ where });
-    if (questions.length === 0) {
+    const { data, error } = await query;
+    
+    if (error) throw error;
+    
+    if (!data || data.length === 0) {
       res.status(404).json({ error: "No questions found" });
       return;
     }
 
-    const randomIndex = Math.floor(Math.random() * questions.length);
-    const randomQuestion = questions[randomIndex];
+    const randomIndex = Math.floor(Math.random() * data.length);
+    const randomRow = data[randomIndex];
+    
+    // Convert to API format
+    const randomQuestion = {
+      id: randomRow.id,
+      title: randomRow.title,
+      description: randomRow.description,
+      difficulty: randomRow.difficulty,
+      topics: randomRow.topics,
+      image_url: randomRow.image_url,
+      createdAt: new Date(randomRow.created_at),
+      updatedAt: new Date(randomRow.updated_at)
+    };
+    
     res.json(randomQuestion);
   } catch (err) {
     const error = err as Error;

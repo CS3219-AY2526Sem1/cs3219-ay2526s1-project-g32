@@ -5,24 +5,25 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "ts-node src/server.ts",
+    "dev": "ts-node index.ts",
+    "dev:watch": "nodemon --exec ts-node index.ts",
     "build": "tsc",
-    "start": "node dist/server.js"
+    "start": "node dist/index.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@supabase/supabase-js": "^2.75.0",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
-    "express": "^5.1.0",
-    "pg": "^8.16.3",
-    "sequelize": "^6.37.7"
+    "express": "^5.1.0"
   },
   "devDependencies": {
     "@types/express": "^5.0.3",
     "@types/node": "^24.8.1",
     "nodemon": "^3.1.10",
+    "ts-node": "^10.9.2",
     "typescript": "^5.9.3"
   }
 }

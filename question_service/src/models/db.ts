@@ -1,18 +1,22 @@
-import { Sequelize } from "sequelize";
+import { createClient } from '@supabase/supabase-js';
 import dotenv from "dotenv";
 
 dotenv.config();
 
-const sequelize = new Sequelize(
-  process.env.DB_NAME!,
-  process.env.DB_USER!,
-  process.env.DB_PASSWORD!,
-  {
-    host: process.env.DB_HOST,
-    port: parseInt(process.env.DB_PORT || "5432"),
-    dialect: "postgres",
-    logging: false
-  }
-);
+// Supabase configuration
+const supabaseUrl = process.env.SUPABASE_URL!;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
-export default sequelize;
+if (!supabaseUrl || !supabaseServiceKey) {
+  throw new Error('Missing Supabase environment variables. Please check SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY');
+}
+
+// Create Supabase client with service role key for server-side operations
+const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+  auth: {
+    autoRefreshToken: false,
+    persistSession: false
+  }
+});
+
+export default supabase;
