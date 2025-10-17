@@ -6,6 +6,10 @@
     "frontend"
   ],
   "devDependencies": {
-    "@types/react": "^19.1.13"
+    "@types/express": "^5.0.3",
+    "@types/node": "^24.8.1",
+    "@types/react": "^19.1.13",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3"
   }
 }
