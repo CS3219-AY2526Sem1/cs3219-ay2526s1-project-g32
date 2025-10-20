@@ -61,7 +61,7 @@ exports.getQuestions = getQuestions;
 // Get a single question
 const getQuestionById = async (req, res) => {
     try {
-        const question = await Question_1.default.findByPk(parseInt(req.params.id));
+        const question = await Question_1.default.findByPk(req.params.id);
         if (!question) {
             res.status(404).json({ error: "Not found" });
             return;
@@ -78,7 +78,7 @@ exports.getQuestionById = getQuestionById;
 const updateQuestion = async (req, res) => {
     try {
         const { id } = req.params;
-        const updatedQuestion = await Question_1.default.update(parseInt(id), req.body);
+        const updatedQuestion = await Question_1.default.update(id, req.body);
         if (!updatedQuestion) {
             res.status(404).json({ error: "Not found" });
             return;
@@ -95,7 +95,7 @@ exports.updateQuestion = updateQuestion;
 const deleteQuestion = async (req, res) => {
     try {
         const { id } = req.params;
-        const deleted = await Question_1.default.destroy(parseInt(id));
+        const deleted = await Question_1.default.destroy(id);
         if (!deleted) {
             res.status(404).json({ error: "Not found" });
             return;

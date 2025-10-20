@@ -1,41 +1,16 @@
 import { Request, Response } from "express";
 import QuestionService, { QuestionCreationAttributes } from "../models/Question";
 import supabase from "../models/db";
-
-// Define interfaces for type safety
-interface CreateQuestionBody {
-  title: string;
-  description: string;
-  difficulty: "Easy" | "Medium" | "Hard";
-  topics: string[];
-  image_url?: string;
-}
-
-interface GetQuestionsQuery {
-  title?: string;
-  difficulty?: "Easy" | "Medium" | "Hard";
-  topic?: string;
-}
-
-interface QuestionParams {
-  id: string;
-}
-
-interface UpdateQuestionBody {
-  title?: string;
-  description?: string;
-  difficulty?: "Easy" | "Medium" | "Hard";
-  topics?: string[];
-  image_url?: string;
-}
-
-interface GetRandomQuestionQuery {
-  difficulty?: "Easy" | "Medium" | "Hard";
-  topic?: string;
-}
+import { 
+  CreateQuestionInput, 
+  UpdateQuestionInput, 
+  GetQuestionsQuery, 
+  GetRandomQuestionQuery,
+  QuestionIdParam 
+} from "../validation/schemas";
 
 // Create a new question
-export const createQuestion = async (req: Request<{}, any, CreateQuestionBody>, res: Response): Promise<void> => {
+export const createQuestion = async (req: Request, res: Response): Promise<void> => {
   try {
     const { title, description, difficulty, topics, image_url } = req.body;
     const question = await QuestionService.create({ title, description, difficulty, topics, image_url });
@@ -47,7 +22,7 @@ export const createQuestion = async (req: Request<{}, any, CreateQuestionBody>, 
 };
 
 // Get all questions (with filters)
-export const getQuestions = async (req: Request<{}, any, any, GetQuestionsQuery>, res: Response): Promise<void> => {
+export const getQuestions = async (req: Request, res: Response): Promise<void> => {
   try {
     const { title, difficulty, topic } = req.query;
     
@@ -90,9 +65,9 @@ export const getQuestions = async (req: Request<{}, any, any, GetQuestionsQuery>
 };
 
 // Get a single question
-export const getQuestionById = async (req: Request<QuestionParams>, res: Response): Promise<void> => {
+export const getQuestionById = async (req: Request, res: Response): Promise<void> => {
   try {
-    const question = await QuestionService.findByPk(parseInt(req.params.id));
+    const question = await QuestionService.findByPk(req.params.id as unknown as number);
     if (!question) {
       res.status(404).json({ error: "Not found" });
       return;
@@ -105,10 +80,10 @@ export const getQuestionById = async (req: Request<QuestionParams>, res: Respons
 };
 
 // Update a question
-export const updateQuestion = async (req: Request<QuestionParams, any, UpdateQuestionBody>, res: Response): Promise<void> => {
+export const updateQuestion = async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const updatedQuestion = await QuestionService.update(parseInt(id), req.body);
+    const updatedQuestion = await QuestionService.update(id as unknown as number, req.body);
     
     if (!updatedQuestion) {
       res.status(404).json({ error: "Not found" });
@@ -123,10 +98,10 @@ export const updateQuestion = async (req: Request<QuestionParams, any, UpdateQue
 };
 
 // Delete a question
-export const deleteQuestion = async (req: Request<QuestionParams>, res: Response): Promise<void> => {
+export const deleteQuestion = async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const deleted = await QuestionService.destroy(parseInt(id));
+    const deleted = await QuestionService.destroy(id as unknown as number);
     if (!deleted) {
       res.status(404).json({ error: "Not found" });
       return;
@@ -139,7 +114,7 @@ export const deleteQuestion = async (req: Request<QuestionParams>, res: Response
 };
 
 // Get random question by difficulty/topic (for matching service)
-export const getRandomQuestion = async (req: Request<{}, any, any, GetRandomQuestionQuery>, res: Response): Promise<void> => {
+export const getRandomQuestion = async (req: Request, res: Response): Promise<void> => {
   try {
     const { difficulty, topic } = req.query;
     
