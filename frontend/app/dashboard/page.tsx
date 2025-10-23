@@ -58,11 +58,20 @@ export default function DashboardPage() {
             </Card>
           </Col>
           <Col xs={24} md={12}>
-            <Card title="What to build next" bordered={false} style={{ boxShadow: '0 12px 40px rgba(0,0,0,0.08)' }}>
-              <Space direction="vertical">
-                <Text>- Surface upcoming sessions from the matching service</Text>
-                <Text>- Display collaborative coding history from the session service</Text>
-                <Text>- Embed peer feedback and analytics widgets</Text>
+            <Card title="Start Coding" bordered={false} style={{ boxShadow: '0 12px 40px rgba(0,0,0,0.08)' }}>
+              <Space direction="vertical" style={{ width: '100%' }}>
+                <Text>Ready to practice coding with a peer? Find your perfect coding partner!</Text>
+                <Button 
+                  type="primary" 
+                  size="large" 
+                  href="/matching"
+                  style={{ width: '100%', marginTop: '16px' }}
+                >
+                  🚀 Find Coding Partner
+                </Button>
+                <Text style={{ fontSize: '12px', color: '#666' }}>
+                  Choose your topic and difficulty to get matched instantly
+                </Text>
               </Space>
             </Card>
           </Col>

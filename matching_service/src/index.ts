@@ -4,6 +4,7 @@
  * and starts the timeout consumer.
  */
 import express, { Express, Request, Response } from 'express';
+import cors from 'cors';
 import dotenv from 'dotenv';
 import matchingRoutes from './routes/matching';
 import { connectRabbitMQ, timeoutService } from './services/timeoutService';
@@ -12,10 +13,27 @@ import { connectRabbitMQ, timeoutService } from './services/timeoutService';
 dotenv.config();
 
 const app: Express = express();
-const PORT: number = parseInt(process.env.PORT || '3000', 10);
+const PORT: number = parseInt(process.env.PORT || '3002', 10);
+
+// Enable CORS for all origins (configure as needed for production)
+app.use(cors({
+  origin: ['http://localhost:3000', 'http://localhost:3001'], // Frontend URLs
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 
 // Middleware to parse incoming JSON requests.
 app.use(express.json());
+
+// Add request logging middleware
+app.use((req: Request, res: Response, next) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url} - User-Agent: ${req.get('User-Agent') || 'N/A'}`);
+  if (req.body && Object.keys(req.body).length > 0) {
+    console.log('Request body:', JSON.stringify(req.body, null, 2));
+  }
+  next();
+});
 
 // Mount the matching API routes.
 app.use('/api/v1/matching', matchingRoutes);
