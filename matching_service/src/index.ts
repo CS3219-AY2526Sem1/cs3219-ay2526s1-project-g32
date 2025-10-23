@@ -7,6 +7,7 @@ import express, { Express, Request, Response } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import matchingRoutes from './routes/matching';
+import healthRoutes from './routes/health';
 import { connectRabbitMQ, timeoutService } from './services/timeoutService';
 
 // Load environment variables from a .env file into process.env
@@ -37,6 +38,9 @@ app.use((req: Request, res: Response, next) => {
 
 // Mount the matching API routes.
 app.use('/api/v1/matching', matchingRoutes);
+
+// Mount the health check routes.
+app.use('/api/v1/matching', healthRoutes);
 
 // A simple root endpoint to confirm the service is running.
 app.get('/', (req: Request, res: Response) => {
