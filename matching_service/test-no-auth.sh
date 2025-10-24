@@ -44,4 +44,16 @@ curl -X DELETE $BASE_URL/requests \
   -w "\nHTTP Status: %{http_code}\n"
 
 echo ""
-echo "🏁 Test completed!"
+echo "7. 🧹 Cleaning up test data..."
+curl -X DELETE $BASE_URL/requests \
+  -H "Content-Type: application/json" \
+  -d '{"userId": "user1", "topic": "Arrays"}' \
+  -w "\nHTTP Status: %{http_code}\n"
+
+curl -X DELETE $BASE_URL/requests \
+  -H "Content-Type: application/json" \
+  -d '{"userId": "user2", "topic": "Arrays"}' \
+  -w "\nHTTP Status: %{http_code}\n"
+
+echo ""
+echo "🏁 Test completed and cleaned up!"
