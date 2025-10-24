@@ -106,19 +106,27 @@ export class SessionManager {
       return;
     }
 
-    const participants = session.participants.map((participant) => {
-      if (participant.userId !== userId) {
-        return participant;
-      }
-
-      return {
-        ...participant,
-        connected,
-      };
+    await this.presence.setPresence(sessionId, {
+      userId,
+      sessionId,
+      connected,
+      lastSeenAt: timestampMs,
     });
 
-    const anyConnected = participants.some((participant) => participant.connected);
-    const allDisconnected = participants.every((participant) => !participant.connected);
+    const participantsWithPresence = session.participants.map((participant) => {
+      if (participant.userId === userId) {
+        return {
+          ...participant,
+          connected,
+          lastSeenAt: timestampMs,
+        };
+      }
+
+      return participant;
+    });
+
+    const anyConnected = participantsWithPresence.some((participant) => participant.connected);
+    const allDisconnected = participantsWithPresence.every((participant) => !participant.connected);
 
     const updatedAt = new Date(timestampMs).toISOString();
     let expiresAtIso = session.expiresAt;
@@ -132,19 +140,13 @@ export class SessionManager {
 
     const updated: SessionSnapshot = SessionSnapshotSchema.parse({
       ...session,
-      participants,
+      participants: participantsWithPresence,
       status: anyConnected ? 'active' : 'pending',
       updatedAt,
       expiresAt: expiresAtIso,
     });
 
     await this.sessions.update(updated);
-    await this.presence.setPresence(sessionId, {
-      userId,
-      sessionId,
-      connected,
-      lastSeenAt: timestampMs,
-    });
   }
 
   async endSession(sessionId: string, _reason?: string): Promise<void> {
