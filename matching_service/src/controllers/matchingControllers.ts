@@ -7,13 +7,35 @@ import { CreateMatchRequest, DeleteMatchRequest } from '../validation/matchingSc
 import { AuthenticatedRequest } from '../middleware/authenticate';
 
 // --- Inter-Service Communication ---
-const COLLABORATION_SERVICE_URL = process.env.COLLABORATION_SERVICE_URL || 'http://localhost:3001/api/v1/collaborations';
-const COLLABORATION_SERVICE_ENABLED = process.env.COLLABORATION_SERVICE_ENABLED !== 'false'; // Default to true unless explicitly disabled
+const COLLABORATION_SERVICE_URL = process.env.COLLABORATION_SERVICE_URL || 'http://localhost:4010/api/v1/sessions';
 
+/**
+ * Creates a collaboration session by calling the collaboration service.
+ * Formats the request according to the collaboration service's SessionCreateSchema.
+ */
 async function createCollaborationSession(user1Id: string, user2Id: string, difficulty: string, topic: string) {
   try {
-    const response = await axios.post(COLLABORATION_SERVICE_URL, { user1Id, user2Id, difficulty, topic });
-    console.log('[Controller] Successfully created collaboration session.');
+    // Generate a unique match ID for this session
+    const matchId = `match-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+    
+    // Convert difficulty to lowercase format expected by collaboration service
+    const normalizedDifficulty = difficulty.toLowerCase();
+    
+    // Format payload according to SessionCreateSchema
+    const sessionPayload = {
+      matchId,
+      topic,
+      difficulty: normalizedDifficulty,
+      participants: [
+        { userId: user1Id },
+        { userId: user2Id }
+      ]
+    };
+
+    console.log(`[Controller] Creating collaboration session for match ${matchId} with payload:`, sessionPayload);
+    
+    const response = await axios.post(COLLABORATION_SERVICE_URL, sessionPayload);
+    console.log('[Controller] Successfully created collaboration session:', response.data);
     return response.data;
   } catch (error: any) {
     let errorMessage = 'Unknown error';
@@ -25,13 +47,6 @@ async function createCollaborationSession(user1Id: string, user2Id: string, diff
       } else if (error.request) {
         // Network error - collaboration service might be down
         errorMessage = 'Collaboration service unavailable';
-        console.warn('[Controller] Collaboration service not available. Creating mock session for testing.');
-        
-        // Return a mock session for testing purposes
-        return {
-          sessionId: `mock-session-${Date.now()}`,
-          message: 'Mock collaboration session created (collaboration service not available)'
-        };
       } else {
         // Other axios error
         errorMessage = error.message || 'Request setup error';
@@ -42,19 +57,10 @@ async function createCollaborationSession(user1Id: string, user2Id: string, diff
 
     console.error('[Controller] Error calling Collaboration Service:', errorMessage);
     
-    // For testing: if it's just a connection error (service not running), return mock data
-    if (errorMessage === 'Collaboration service unavailable') {
-      console.warn('[Controller] Returning mock session due to unavailable collaboration service.');
-      return {
-        sessionId: `mock-session-${Date.now()}`,
-        message: 'Mock collaboration session created (collaboration service not available)'
-      };
-    }
-    
-    // CRITICAL: Re-queue both users if the collaboration service fails with other errors.
+    // CRITICAL: Re-queue both users if the collaboration service fails.
     await queueService.addToFrontOfQueue({ userId: user1Id, difficulty, timestamp: Date.now() }, topic);
     await queueService.addToFrontOfQueue({ userId: user2Id, difficulty, timestamp: Date.now() }, topic);
-    console.log(`[Controller] Re-queued users ${user1Id} and ${user2Id} due to collaboration service error.`);
+    console.log(`[Controller] Re-queued users ${user1Id} and ${user2Id} due to collaboration service error: ${errorMessage}`);
     throw new Error('Failed to create collaboration session.');
   }
 }
@@ -74,17 +80,8 @@ export const createMatchRequest = async (req: AuthenticatedRequest, res: Respons
     if (matchedUser) {
       console.log(`[Controller] Match found for ${userId}! Matched with ${matchedUser.userId}.`);
       
-      let session;
-      if (COLLABORATION_SERVICE_ENABLED) {
-        session = await createCollaborationSession(userId, matchedUser.userId, difficulty, topic);
-      } else {
-        // Mock session for testing when collaboration service is disabled
-        session = {
-          sessionId: `test-session-${Date.now()}`,
-          message: 'Testing mode - collaboration service disabled'
-        };
-        console.log('[Controller] Using mock session (collaboration service disabled).');
-      }
+      // Create collaboration session
+      const session = await createCollaborationSession(userId, matchedUser.userId, difficulty, topic);
 
       // Set status to success only after the session is created.
       await redisClient.set(`match_status:${userId}`, 'success');
