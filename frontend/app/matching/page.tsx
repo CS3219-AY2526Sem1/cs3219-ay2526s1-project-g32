@@ -1,11 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Button, Card, Col, Layout, Row, Select, Space, Typography, message } from 'antd';
+import { Button, Card, Col, ConfigProvider, Layout, Row, Select, Space, Typography, message } from 'antd';
 import { PlayCircleOutlined, UserOutlined, ClockCircleOutlined } from '@ant-design/icons';
 import { useAuth } from '../../hooks/useAuth';
 import { useRequireAuth } from '../../hooks/useRequireAuth';
 import { startMatchmaking, getMatchStatus, cancelMatch } from '../../lib/api-client';
+import { peerPrepTheme } from '../../lib/theme';
 
 const { Header, Content } = Layout;
 const { Title, Text, Paragraph } = Typography;
@@ -62,11 +63,15 @@ export default function MatchingPage() {
 
   if (!isReady) {
     return (
-      <Layout style={{ minHeight: '100vh' }}>
-        <Content className="centered-section">
-          <Title level={4}>Loading session...</Title>
-        </Content>
-      </Layout>
+      <ConfigProvider theme={peerPrepTheme}>
+        <Layout style={{ minHeight: '100vh', background: 'var(--bg)' }}>
+          <Content className="main-content">
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '50vh' }}>
+              <Title level={4} style={{ color: 'var(--text)' }}>Loading session...</Title>
+            </div>
+          </Content>
+        </Layout>
+      </ConfigProvider>
     );
   }
 
@@ -121,51 +126,87 @@ export default function MatchingPage() {
   const username = user.userMetadata?.username as string || user.email || 'User';
 
   return (
-    <Layout style={{ minHeight: '100vh' }}>
-      <Header style={{ 
-        display: 'flex', 
-        alignItems: 'center', 
-        justifyContent: 'space-between',
-        background: '#001529'
-      }}>
-        <Title level={4} style={{ color: '#fff', margin: 0 }}>
-          🧩 Find Your Coding Partner
-        </Title>
-        <Space>
-          <Text style={{ color: '#fff' }}>Welcome, {username}</Text>
-          <Button onClick={logout}>Log out</Button>
-          <Button type="primary" href="/dashboard">
-            Dashboard
-          </Button>
-        </Space>
-      </Header>
+    <ConfigProvider theme={peerPrepTheme}>
+      <Layout style={{ minHeight: '100vh', background: 'var(--bg)' }}>
+        <Header className="header-dark">
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+                style={{ color: 'var(--primary-600)' }}
+              >
+                <path
+                  d="M12 2L2 7L12 12L22 7L12 2Z"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+                <path
+                  d="M2 17L12 22L22 17"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+                <path
+                  d="M2 12L12 17L22 12"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              <Title level={4} style={{ color: '#fff', margin: 0 }}>
+                🧩 Find Your Coding Partner
+              </Title>
+            </div>
 
-      <Content style={{ padding: '24px', background: '#f0f2f5' }}>
-        <Row gutter={[24, 24]} justify="center">
-          <Col xs={24} sm={20} md={16} lg={12} xl={10}>
-            <Card
-              title={
-                <Space>
-                  <UserOutlined />
-                  <span>Matchmaking Setup</span>
-                </Space>
-              }
-              bordered={false}
-              style={{ 
-                boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-                borderRadius: '8px'
-              }}
-            >
+            <Space>
+              <Text style={{ color: 'var(--muted)' }}>Welcome, {username}</Text>
+              <Button type="link" onClick={logout}>
+                Log out
+              </Button>
+              <Button type="primary" href="/dashboard">
+                Dashboard
+              </Button>
+            </Space>
+          </div>
+        </Header>
+
+        <Content className="main-content">
+          {/* background shapes */}
+          <div className="blob" aria-hidden="true" />
+          <div className="blob-bottom" aria-hidden="true" />
+          {/* soft blur across the whole background */}
+          <div className="bg-blur-overlay" aria-hidden="true" />
+          <div style={{ position: 'relative', zIndex: 2, maxWidth: '800px', margin: '0 auto' }}>
+            <Row gutter={[24, 24]} justify="center">
+              <Col xs={24} sm={20} md={16} lg={12} xl={10}>
+                <Card
+                  className="dark-card"
+                  title={
+                    <Space>
+                      <UserOutlined />
+                      <span>Matchmaking Setup</span>
+                    </Space>
+                  }
+                  bordered
+                >
               <Space direction="vertical" size="large" style={{ width: '100%' }}>
                 <div>
-                  <Paragraph>
+                  <Paragraph style={{ color: 'var(--muted)' }}>
                     Select your preferred coding topic and difficulty level to find the perfect practice partner.
                   </Paragraph>
                 </div>
 
                 {/* Topic Selection */}
                 <div>
-                  <Text strong style={{ display: 'block', marginBottom: '8px' }}>
+                  <Text strong style={{ display: 'block', marginBottom: '8px', color: 'var(--text)' }}>
                     Coding Topic
                   </Text>
                   <Select
@@ -186,7 +227,7 @@ export default function MatchingPage() {
 
                 {/* Difficulty Selection */}
                 <div>
-                  <Text strong style={{ display: 'block', marginBottom: '8px' }}>
+                  <Text strong style={{ display: 'block', marginBottom: '8px', color: 'var(--text)' }}>
                     Difficulty Level
                   </Text>
                   <Select
@@ -249,11 +290,11 @@ export default function MatchingPage() {
                           }} 
                         />
                         <div>
-                          <Text strong style={{ fontSize: '16px' }}>
+                          <Text strong style={{ fontSize: '16px', color: 'var(--text)' }}>
                             Finding your coding partner...
                           </Text>
                           <br />
-                          <Text type="secondary">
+                          <Text style={{ color: 'var(--muted)' }}>
                             Topic: {selectedTopic} • Difficulty: {selectedDifficulty}
                           </Text>
                         </div>
@@ -276,21 +317,24 @@ export default function MatchingPage() {
                 {/* Info Section */}
                 {!isMatching && (
                   <div style={{ 
-                    background: '#f6f8fa', 
+                    background: 'rgba(255,255,255,0.08)', 
                     padding: '16px', 
                     borderRadius: '6px',
-                    marginTop: '24px'
+                    marginTop: '24px',
+                    border: '1px solid var(--border)'
                   }}>
-                    <Text type="secondary" style={{ fontSize: '14px' }}>
-                      💡 <strong>How it works:</strong> We'll match you with another developer who selected the same topic and difficulty. Once matched, you'll be redirected to a collaborative coding session.
+                    <Text style={{ fontSize: '14px', color: 'var(--muted)' }}>
+                      💡 <strong style={{ color: 'var(--text)' }}>How it works:</strong> We'll match you with another developer who selected the same topic and difficulty. Once matched, you'll be redirected to a collaborative coding session.
                     </Text>
                   </div>
                 )}
               </Space>
-            </Card>
-          </Col>
-        </Row>
-      </Content>
-    </Layout>
+                </Card>
+              </Col>
+            </Row>
+          </div>
+        </Content>
+      </Layout>
+    </ConfigProvider>
   );
 }

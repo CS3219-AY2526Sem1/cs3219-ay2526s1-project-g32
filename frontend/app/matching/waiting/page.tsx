@@ -1,11 +1,12 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Button, Card, Layout, Progress, Space, Typography } from 'antd';
+import { Button, Card, ConfigProvider, Layout, Progress, Space, Typography } from 'antd';
 import { ClockCircleOutlined, UserOutlined } from '@ant-design/icons';
 import { useAuth } from '../../../hooks/useAuth';
 import { useRequireAuth } from '../../../hooks/useRequireAuth';
 import { getMatchStatus, cancelMatch } from '../../../lib/api-client';
+import { peerPrepTheme } from '../../../lib/theme';
 
 const { Header, Content } = Layout;
 const { Title, Text, Paragraph } = Typography;
@@ -54,11 +55,15 @@ export default function MatchingWaitingPage() {
 
   if (!isReady) {
     return (
-      <Layout style={{ minHeight: '100vh' }}>
-        <Content className="centered-section">
-          <Title level={4}>Loading session...</Title>
-        </Content>
-      </Layout>
+      <ConfigProvider theme={peerPrepTheme}>
+        <Layout style={{ minHeight: '100vh', background: 'var(--bg)' }}>
+          <Content className="main-content">
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '50vh' }}>
+              <Title level={4} style={{ color: 'var(--text)' }}>Loading session...</Title>
+            </div>
+          </Content>
+        </Layout>
+      </ConfigProvider>
     );
   }
 
@@ -85,47 +90,85 @@ export default function MatchingWaitingPage() {
   const username = user.userMetadata?.username as string || user.email || 'User';
 
   return (
-    <Layout style={{ minHeight: '100vh' }}>
-      <Header style={{ 
-        display: 'flex', 
-        alignItems: 'center', 
-        justifyContent: 'space-between',
-        background: '#001529'
-      }}>
-        <Title level={4} style={{ color: '#fff', margin: 0 }}>
-          🔍 Finding Your Match...
-        </Title>
-        <Space>
-          <Text style={{ color: '#fff' }}>Welcome, {username}</Text>
-          <Button onClick={logout}>Log out</Button>
-          <Button type="primary" href="/dashboard">
-            Dashboard
-          </Button>
-        </Space>
-      </Header>
+    <ConfigProvider theme={peerPrepTheme}>
+      <Layout style={{ minHeight: '100vh', background: 'var(--bg)' }}>
+        <Header className="header-dark">
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+                style={{ color: 'var(--primary-600)' }}
+              >
+                <path
+                  d="M12 2L2 7L12 12L22 7L12 2Z"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+                <path
+                  d="M2 17L12 22L22 17"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+                <path
+                  d="M2 12L12 17L22 12"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              <Title level={4} style={{ color: '#fff', margin: 0 }}>
+                🔍 Finding Your Match...
+              </Title>
+            </div>
 
-      <Content style={{ padding: '50px', background: '#f0f2f5', minHeight: 'calc(100vh - 64px)' }}>
-        <div style={{ maxWidth: '600px', margin: '0 auto', textAlign: 'center' }}>
-          <Card
-            bordered={false}
-            style={{ 
-              boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
-              borderRadius: '12px',
-              padding: '40px 20px'
-            }}
-          >
+            <Space>
+              <Text style={{ color: 'var(--muted)' }}>Welcome, {username}</Text>
+              <Button type="link" onClick={logout}>
+                Log out
+              </Button>
+              <Button type="primary" href="/dashboard">
+                Dashboard
+              </Button>
+            </Space>
+          </div>
+        </Header>
+
+        <Content className="main-content">
+          {/* background shapes */}
+          <div className="blob" aria-hidden="true" />
+          <div className="blob-bottom" aria-hidden="true" />
+          {/* soft blur across the whole background */}
+          <div className="bg-blur-overlay" aria-hidden="true" />
+          <div style={{ position: 'relative', zIndex: 2, maxWidth: '600px', margin: '0 auto', textAlign: 'center' }}>
+            <Card
+              className="dark-card"
+              bordered
+              style={{ 
+                borderRadius: '12px',
+                padding: '40px 20px'
+              }}
+            >
             <Space direction="vertical" size="large" style={{ width: '100%' }}>
               {/* Animated Icon */}
-              <div style={{ fontSize: '80px', color: '#1890ff', marginBottom: '20px' }}>
+              <div style={{ fontSize: '80px', color: 'var(--primary-600)', marginBottom: '20px' }}>
                 <ClockCircleOutlined spin />
               </div>
 
               {/* Main Message */}
               <div>
-                <Title level={2} style={{ marginBottom: '8px', color: '#1890ff' }}>
+                <Title level={2} style={{ marginBottom: '8px', color: 'var(--primary-600)' }}>
                   Searching for Your Perfect Match
                 </Title>
-                <Paragraph style={{ fontSize: '16px', color: '#666', marginBottom: '30px' }}>
+                <Paragraph style={{ fontSize: '16px', color: 'var(--muted)', marginBottom: '30px' }}>
                   We're finding another developer who shares your coding interests. 
                   This usually takes less than 2 minutes.
                 </Paragraph>
@@ -143,8 +186,8 @@ export default function MatchingWaitingPage() {
                   }}
                 />
                 <div style={{ marginTop: '12px', display: 'flex', justifyContent: 'space-between' }}>
-                  <Text style={{ color: '#999' }}>Elapsed time:</Text>
-                  <Text strong style={{ color: '#1890ff', fontSize: '16px' }}>
+                  <Text style={{ color: 'var(--muted)' }}>Elapsed time:</Text>
+                  <Text strong style={{ color: 'var(--primary-600)', fontSize: '16px' }}>
                     {formatTime(waitingTime)}
                   </Text>
                 </div>
@@ -152,16 +195,16 @@ export default function MatchingWaitingPage() {
 
               {/* Status Info */}
               <div style={{ 
-                background: '#f6f8fa', 
+                background: 'rgba(255,255,255,0.08)', 
                 padding: '20px', 
                 borderRadius: '8px',
-                border: '1px solid #e1e4e8'
+                border: '1px solid var(--border)'
               }}>
                 <Space direction="vertical" align="center" size="small">
-                  <UserOutlined style={{ fontSize: '24px', color: '#1890ff' }} />
-                  <Text strong>Looking for developers...</Text>
-                  <Text type="secondary" style={{ textAlign: 'center' }}>
-                    Status: <strong>{matchStatus}</strong>
+                  <UserOutlined style={{ fontSize: '24px', color: 'var(--primary-600)' }} />
+                  <Text strong style={{ color: 'var(--text)' }}>Looking for developers...</Text>
+                  <Text style={{ textAlign: 'center', color: 'var(--muted)' }}>
+                    Status: <strong style={{ color: 'var(--text)' }}>{matchStatus}</strong>
                   </Text>
                 </Space>
               </div>
@@ -182,20 +225,21 @@ export default function MatchingWaitingPage() {
 
               {/* Helpful Tips */}
               <div style={{ 
-                background: '#fff7e6', 
-                border: '1px solid #ffd591',
+                background: 'rgba(255,255,255,0.06)', 
+                border: '1px solid var(--border)',
                 borderRadius: '6px',
                 padding: '16px',
                 marginTop: '20px'
               }}>
-                <Text style={{ fontSize: '14px', color: '#ad6800' }}>
-                  💡 <strong>Tip:</strong> While you wait, the system is matching you based on your selected topic and difficulty level. Peak hours typically have faster matching!
+                <Text style={{ fontSize: '14px', color: 'var(--muted)' }}>
+                  💡 <strong style={{ color: 'var(--text)' }}>Tip:</strong> While you wait, the system is matching you based on your selected topic and difficulty level. Peak hours typically have faster matching!
                 </Text>
               </div>
             </Space>
-          </Card>
-        </div>
-      </Content>
-    </Layout>
+            </Card>
+          </div>
+        </Content>
+      </Layout>
+    </ConfigProvider>
   );
 }
