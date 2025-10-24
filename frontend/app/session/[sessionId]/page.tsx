@@ -83,10 +83,6 @@ export default function SessionPage({ params }: SessionPageProps) {
   }, [params.sessionId]);
 
   useEffect(() => {
-    initializedRef.current = false;
-  }, [params.sessionId]);
-
-  useEffect(() => {
     let cancelled = false;
 
     const bootstrap = async () => {
