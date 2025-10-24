@@ -36,7 +36,7 @@ export class SessionController {
   };
 
   private async fetchQuestion(topic: string, difficulty: string) {
-    const url = new URL('/questions/random', this.questionServiceBaseUrl);
+    const url = new URL('questions/random', this.questionServiceBaseUrl);
     url.searchParams.set('topic', topic);
     url.searchParams.set('difficulty', difficulty);
 
