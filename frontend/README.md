@@ -22,6 +22,7 @@ The app runs on `http://localhost:3000` by default.
 ## Key Folders
 
 - `app/` – App Router routes (`page.tsx`, `login/page.tsx`, `register/page.tsx`, `verify-email/page.tsx`, `verify-success/page.tsx`, `dashboard/page.tsx`) plus layout/providers.
+- `app/session/[sessionId]/page.tsx` – Collaboration coding surface (question panel + Monaco editor scaffold, presently using mock data).
 - `context/AuthContext.tsx` – Stores session state, hydrates from `localStorage`, and fetches `/auth/me` when a token is present.
 - `hooks/` – `useAuth` for consuming the context and `useRequireAuth` for guarding routes.
 - `lib/api-client.ts` – Typed fetch wrapper for all user-service endpoints.
@@ -37,6 +38,8 @@ The app runs on `http://localhost:3000` by default.
 | --- | --- |
 | `NEXT_PUBLIC_USER_SERVICE_URL` | Base URL for the user service (`http://localhost:4001/api/v1` by default). |
 | `NEXT_PUBLIC_VERIFY_REDIRECT` | URL embedded in Supabase magic-link emails (`http://localhost:3000/verify-success`). |
+| `NEXT_PUBLIC_COLLAB_SERVICE_URL` | Collaboration service REST base (`http://localhost:4010/api/v1`). |
+| `NEXT_PUBLIC_COLLAB_WS_URL` | Collaboration WebSocket endpoint (`ws://localhost:4010/collab`). |
 
 ## Flow Overview
 

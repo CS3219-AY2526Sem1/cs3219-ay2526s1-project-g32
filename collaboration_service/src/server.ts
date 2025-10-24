@@ -4,7 +4,7 @@ import { buildApp } from './app';
 import { config } from './config';
 import { SessionController } from './controllers';
 import { RedisPresenceRepository, RedisSessionRepository } from './repositories';
-import { SessionManager, StubQuestionServiceClient } from './services';
+import { SessionManager } from './services';
 import { attachCollaborationGateway } from './websocket';
 import { logger } from './utils/logger';
 
@@ -19,11 +19,9 @@ const sessionManager = new SessionManager(sessionRepository, presenceRepository,
   jwtSecret: config.jwt.secret,
 });
 
-const questionClient = new StubQuestionServiceClient();
-
 const sessionController = new SessionController(
   sessionManager,
-  questionClient,
+  config.services.question.baseUrl,
   config.services.user.baseUrl,
   config.websocket.baseUrl,
 );
