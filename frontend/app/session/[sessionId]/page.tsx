@@ -198,7 +198,7 @@ export default function SessionPage({ params }: SessionPageProps) {
       bindingRef.current?.destroy();
       bindingRef.current = null;
     };
-  }, [sessionSnapshot, yText]);
+  }, [sessionSnapshot, sessionToken, yText]);
 
   useEffect(() => {
     if (!sessionSnapshot) {
