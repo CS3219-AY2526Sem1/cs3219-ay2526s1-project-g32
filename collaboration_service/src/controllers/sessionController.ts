@@ -6,13 +6,12 @@ import {
   SessionIdParamsSchema,
   SessionTokenRequestSchema,
 } from '../schemas';
-import type { QuestionServiceClient } from '../services';
 import type { SessionManager } from '../services/sessionManager';
 
 export class SessionController {
   constructor(
     private readonly sessionManager: SessionManager,
-    private readonly questionService: QuestionServiceClient,
+    private readonly questionServiceBaseUrl: string,
     private readonly userServiceBaseUrl: string,
     private readonly websocketBaseUrl: string,
   ) {}
@@ -21,7 +20,7 @@ export class SessionController {
     try {
       const payload = SessionCreateSchema.parse(req.body);
 
-      const question = await this.questionService.selectQuestion(payload.topic, payload.difficulty);
+      const question = await this.fetchQuestion(payload.topic, payload.difficulty);
       const session = await this.sessionManager.createSession(payload, question);
 
       const response = SessionCreateResponseSchema.parse({
@@ -35,6 +34,47 @@ export class SessionController {
       next(error);
     }
   };
+
+  private async fetchQuestion(topic: string, difficulty: string) {
+    const url = new URL('questions/random', this.questionServiceBaseUrl);
+    url.searchParams.set('topic', topic);
+    url.searchParams.set('difficulty', difficulty);
+
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Question service responded with status ${response.status}`);
+    }
+
+    const data = (await response.json()) as {
+      id: number;
+      title: string;
+      description: string;
+      difficulty: string;
+      topics?: string[];
+    };
+
+    const normalizedDifficulty = (data.difficulty ?? difficulty).toString().toLowerCase() as
+      | 'easy'
+      | 'medium'
+      | 'hard';
+
+    return {
+      questionId: String(data.id),
+      title: data.title,
+      prompt: data.description,
+      starterCode: {},
+      metadata: {
+        difficulty: normalizedDifficulty,
+        topics: data.topics ?? [],
+      },
+    };
+  }
 
   getSession = async (req: Request, res: Response, next: NextFunction) => {
     try {
