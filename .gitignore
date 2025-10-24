@@ -2,6 +2,7 @@ node_modules
 .env
 .DS_Store
 user_service/dist/
+question_service/dist/
 frontend/.next/
 frontend/out/
 frontend/.env.local
