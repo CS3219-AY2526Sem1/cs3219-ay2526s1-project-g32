@@ -7,6 +7,7 @@ import { Alert, Button, Card, ConfigProvider, Form, Input, Typography } from 'an
 
 import { login as loginApi, type LoginPayload } from '../../lib/api-client';
 import { useAuth } from '../../hooks/useAuth';
+import { authTheme } from '../../lib/theme';
 
 const { Title, Paragraph } = Typography;
 const REGISTER_ROUTE = '/register' as Route;
@@ -35,41 +36,11 @@ export default function LoginPage() {
   };
 
   return (
-    <ConfigProvider
-      theme={{
-        token: {
-          colorPrimary: '#6366F1',
-          colorBgBase: '#0A1017',
-          colorTextBase: '#ffffff',
-          colorBorder: 'rgba(255,255,255,0.1)',
-          fontFamily: '"Space Grotesk","Noto Sans",system-ui,-apple-system,"Segoe UI",sans-serif',
-        },
-        components: {
-          Card: {
-            colorBgContainer: 'rgba(255,255,255,0.04)',
-            headerBg: 'transparent',
-            headerPadding: 0,
-          },
-          Input: {
-            colorBgContainer: '#111827',
-            colorBorder: '#374151',
-            colorTextPlaceholder: '#9CA3AF',
-            borderRadius: 10,
-            controlHeight: 40,
-          },
-          Button: {
-            borderRadius: 10,
-            fontWeight: 600,
-          },
-          Form: {
-            labelColor: 'rgba(255,255,255,0.75)',
-          },
-        },
-      }}
-    >
-      <header className="auth-header">
-        <Title level={3} style={{ margin: 0 }}>PeerPrep</Title>
-      </header>
+    <ConfigProvider theme={authTheme}>
+      <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
+        <header className="auth-header">
+          <Title level={3} style={{ margin: 0 }}>PeerPrep</Title>
+        </header>
 
       <div className="auth-shell">
         <Card className="auth-card" bordered>
@@ -126,6 +97,7 @@ export default function LoginPage() {
             </Button>
           </Paragraph>
         </Card>
+      </div>
       </div>
     </ConfigProvider>
   );

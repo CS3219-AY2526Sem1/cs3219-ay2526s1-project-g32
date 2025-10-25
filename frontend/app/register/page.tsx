@@ -8,6 +8,7 @@ import { Alert, Button, Card, ConfigProvider, Form, Input, Typography } from 'an
 import { MailOutlined, LockOutlined, UserOutlined } from '@ant-design/icons';
 
 import { register as registerApi, type RegisterPayload } from '../../lib/api-client';
+import { authTheme } from '../../lib/theme';
 
 const LOGIN_ROUTE = '/login' as Route;
 const VERIFY_EMAIL_ROUTE = '/verify-email' as Route;
@@ -42,48 +43,16 @@ export default function RegisterPage() {
   };
 
   return (
-    <ConfigProvider
-      theme={{
-        token: {
-          colorPrimary: '#137fec',
-          colorBgBase: '#0A1017',
-          colorTextBase: '#ffffff',
-          colorBorder: 'rgba(255,255,255,0.1)',
-          fontFamily:
-            '"Space Grotesk","Noto Sans",system-ui,-apple-system,"Segoe UI",sans-serif',
-        },
-        components: {
-          Card: {
-            colorBgContainer: 'rgba(255,255,255,0.04)',
-            headerBg: 'transparent',
-            headerPadding: 0,
-          },
-          Input: {
-            colorBgContainer: '#2d3748',
-            colorBorder: '#374151',
-            colorTextPlaceholder: '#9CA3AF',
-            borderRadius: 10,
-            controlHeight: 44,
-            paddingBlock: 10,
-          },
-          Button: {
-            borderRadius: 10,
-            fontWeight: 600,
-          },
-          Form: {
-            labelColor: 'rgba(255,255,255,0.75)',
-          },
-        },
-      }}
-    >
-      {/* Brand header (reusing .auth-header) */}
-      <header className="auth-header">
-        <svg width="32" height="32" viewBox="0 0 48 48" fill="none" style={{ color: '#137fec' }}
-             xmlns="http://www.w3.org/2000/svg">
-          <path d="M6 6H42L36 24L42 42H6L12 24L6 6Z" fill="currentColor" />
-        </svg>
-        <Title level={3} style={{ margin: 0 }}>PeerPrep</Title>
-      </header>
+    <ConfigProvider theme={authTheme}>
+      <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
+        {/* Brand header (reusing .auth-header) */}
+        <header className="auth-header">
+          <svg width="32" height="32" viewBox="0 0 48 48" fill="none" style={{ color: '#6366F1' }}
+               xmlns="http://www.w3.org/2000/svg">
+            <path d="M6 6H42L36 24L42 42H6L12 24L6 6Z" fill="currentColor" />
+          </svg>
+          <Title level={3} style={{ margin: 0 }}>PeerPrep</Title>
+        </header>
 
       <div className="auth-shell">
         <Card className="auth-card" bordered>
@@ -163,11 +132,12 @@ export default function RegisterPage() {
 
           <Paragraph style={{ textAlign: 'center', marginTop: 16 }}>
             <Text style={{ color: 'rgba(255,255,255,0.7)' }}>Already have an account? </Text>
-            <Link href={LOGIN_ROUTE} className="ant-typography" style={{ color: '#137fec' }}>
+            <Link href={LOGIN_ROUTE} className="ant-typography" style={{ color: '#6366F1' }}>
               Log in
             </Link>
           </Paragraph>
         </Card>
+      </div>
       </div>
     </ConfigProvider>
   );

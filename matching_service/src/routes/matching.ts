@@ -5,6 +5,7 @@ import {
     getMatchStatus,
     handleRequeue
 } from '../controllers/matchingControllers';
+import { cleanupRedis } from '../controllers/cleanupController';
 import { validateRequest } from '../middleware/validateRequest';
 import { authenticate } from '../middleware/authenticate';
 import {
@@ -43,5 +44,12 @@ router.get('/requests/:userId/status', authenticate, validateRequest(getMatchSta
  * @access  Private (Requires authentication) - Internal service endpoint
  */
 router.post('/requeue', authenticate, validateRequest(handleRequeueSchema), handleRequeue);
+
+/**
+ * @route   POST /api/v1/matching/cleanup
+ * @desc    Clean up all matching data from Redis (Development only)
+ * @access  Public (Development only)
+ */
+router.post('/cleanup', cleanupRedis);
 
 export default router;

@@ -1,18 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
-import dotenv from "dotenv";
-
-dotenv.config();
-
-// Supabase configuration
-const supabaseUrl = process.env.SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-
-if (!supabaseUrl || !supabaseServiceKey) {
-  throw new Error('Missing Supabase environment variables. Please check SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY');
-}
+import { config } from '../config';
 
 // Create Supabase client with service role key for server-side operations
-const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+const supabase = createClient(config.supabase.url, config.supabase.serviceRoleKey, {
   auth: {
     autoRefreshToken: false,
     persistSession: false

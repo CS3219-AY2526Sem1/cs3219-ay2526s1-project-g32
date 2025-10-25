@@ -1,33 +1,13 @@
 'use client';
 import { Button, ConfigProvider, Layout, Space, Typography } from 'antd';
+import { peerPrepTheme } from '../lib/theme';
 
 const { Header, Content } = Layout;
 const { Title, Paragraph } = Typography;
 
 export default function HomePage() {
   return (
-    <ConfigProvider
-      theme={{
-        token: {
-          colorPrimary: '#1380ec', // primary-600
-          colorTextBase: '#ffffff',
-          colorBgBase: '#0A1017',
-          fontFamily:
-            '"Space Grotesk","Noto Sans",system-ui,-apple-system,"Segoe UI",sans-serif',
-        },
-        components: {
-          Layout: {
-            headerBg: 'transparent',
-            bodyBg: 'transparent',
-            headerPadding: 0,
-          },
-          Button: {
-            fontWeight: 600,
-            borderRadius: 6,
-          },
-        },
-      }}
-    >
+    <ConfigProvider theme={peerPrepTheme}>
       <Layout style={{ minHeight: '100vh', background: 'var(--bg)' }}>
         <Header className="header-dark">
           <div

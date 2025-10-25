@@ -1,4 +1,5 @@
 ﻿const API_BASE_URL = process.env.NEXT_PUBLIC_USER_SERVICE_URL ?? 'http://localhost:4001/api/v1';
+const MATCHING_SERVICE_URL = process.env.NEXT_PUBLIC_MATCHING_SERVICE_URL ?? 'http://localhost:3002/api/v1/matching';
 const DEFAULT_VERIFY_REDIRECT =
   process.env.NEXT_PUBLIC_VERIFY_REDIRECT ?? 'http://localhost:3000/verify-success';
 
@@ -105,6 +106,64 @@ export const fetchMe = async (accessToken: string) =>
       headers: {
         Authorization: `Bearer ${accessToken}`,
       },
+    }),
+  );
+
+// Matching Service API Types
+export type CreateMatchRequest = {
+  difficulty: 'Easy' | 'Medium' | 'Hard';
+  topic: string;
+};
+
+export type MatchResponse = {
+  status: 'success' | 'pending';
+  message: string;
+  sessionId?: string;
+  matchedWith?: string;
+};
+
+export type MatchStatusResponse = {
+  status: 'pending' | 'success' | 'not_found';
+};
+
+export type CancelMatchRequest = {
+  topic: string;
+};
+
+// Matching Service API Functions
+const withMatchingUrl = (path: string) => `${MATCHING_SERVICE_URL}${path}`;
+
+export const startMatchmaking = async (topic: string, difficulty: string, accessToken: string) =>
+  handleResponse<MatchResponse>(
+    await fetch(withMatchingUrl('/requests'), {
+      method: 'POST',
+      headers: {
+        ...jsonHeaders,
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({ topic, difficulty }),
+    }),
+  );
+
+export const getMatchStatus = async (userId: string, accessToken: string) =>
+  handleResponse<MatchStatusResponse>(
+    await fetch(withMatchingUrl(`/requests/${userId}/status`), {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    }),
+  );
+
+export const cancelMatch = async (topic: string, accessToken: string) =>
+  handleResponse<{ message: string }>(
+    await fetch(withMatchingUrl('/requests'), {
+      method: 'DELETE',
+      headers: {
+        ...jsonHeaders,
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({ topic }),
     }),
   );
 
