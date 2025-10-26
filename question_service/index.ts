@@ -47,7 +47,7 @@ const startServer = async (): Promise<void> => {
     
     // Test Supabase connection
     const { data, error } = await supabase.from("questions").select("*");
-    console.log(data);
+    logger.debug({ questionCount: data?.length }, 'Questions fetched')
     if (error) {
       logger.error({ err: error }, "Supabase connection failed");
       throw error;
