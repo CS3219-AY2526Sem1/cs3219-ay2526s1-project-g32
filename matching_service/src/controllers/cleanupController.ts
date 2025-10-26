@@ -1,6 +1,8 @@
 import { Request, Response } from 'express';
 import redisClient from '../redisClient';
 
+const REDIS_SCAN_COUNT = 100;
+
 /**
  * Development-only endpoint to clean up all matching data from Redis.
  * This should not be exposed in production.
@@ -19,7 +21,7 @@ export const cleanupRedis = async (req: Request, res: Response) => {
     do {
       const scanResult = await redisClient.scan(cursor, {
         MATCH: 'match_queue:*',
-        COUNT: 100
+        COUNT: REDIS_SCAN_COUNT
       });
       
       cursor = scanResult.cursor;
