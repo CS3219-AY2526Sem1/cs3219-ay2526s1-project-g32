@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Button, Card, ConfigProvider, Layout, Progress, Space, Typography } from 'antd';
 import { ClockCircleOutlined, UserOutlined } from '@ant-design/icons';
 import { useAuth } from '../../../hooks/useAuth';
@@ -17,6 +17,8 @@ export default function MatchingWaitingPage() {
   
   const [waitingTime, setWaitingTime] = useState(0);
   const [matchStatus, setMatchStatus] = useState<'pending' | 'success' | 'not_found'>('pending');
+  // Ensure we only redirect once when a match is ready
+  const redirectingRef = useRef(false);
 
   // Poll for match status
   useEffect(() => {
@@ -24,11 +26,41 @@ export default function MatchingWaitingPage() {
 
     const checkStatus = async () => {
       try {
-        const status = await getMatchStatus(user.id, session.accessToken);
-        setMatchStatus(status.status);
-        
-        if (status.status === 'success') {
-          // TODO: Redirect to collaboration session
+        // Accept any shape from server; we only rely on known fields below
+        const res: any = await getMatchStatus(user.id, session.accessToken);
+        const status = res?.status;
+        if (status) setMatchStatus(status);
+
+        if (status === 'success' && !redirectingRef.current) {
+          // Try common fields where the collaboration service might provide the session URL
+          const url =
+            res?.collaborationUrl ||
+            res?.sessionUrl ||
+            res?.url ||
+            res?.session?.url;
+
+          // If the service returned a sessionId, use a sensible fallback route.
+          // Adjust this route if your backend uses a different client path.
+          const sessionId = res?.sessionId;
+
+          redirectingRef.current = true;
+          // Clear any further polling by letting cleanup run on unmount or by relying on the immediate redirect
+          try {
+            if (url) {
+              window.location.href = url;
+              return;
+            }
+
+            if (sessionId) {
+              window.location.href = `/collaboration/${sessionId}`;
+              return;
+            }
+
+            // If no redirect information is present, keep showing success state but stop re-redirect attempts
+            // (You may want to fetch another endpoint here to obtain the session URL.)
+          } catch (err) {
+            console.error('Redirect failed:', err);
+          }
         }
       } catch (error) {
         console.error('Error checking match status:', error);
