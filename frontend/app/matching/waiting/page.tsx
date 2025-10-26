@@ -104,11 +104,59 @@ export default function MatchingWaitingPage() {
   }
 
   const handleCancelMatch = async () => {
+    // Try to read the selected topic from multiple possible places where it might have been persisted.
+    const getPersistedTopic = () => {
+      try {
+        const params = new URLSearchParams(window.location.search);
+        const qTopic = params.get('topic');
+
+        const hist = (window.history && (window.history.state as any)) || {};
+        const hTopic = hist?.topic || hist?.state?.topic || null;
+
+        const ssTopic = sessionStorage.getItem('matchingTopic') || localStorage.getItem('matchingTopic');
+
+        return qTopic || hTopic || ssTopic || null;
+      } catch (e) {
+        return null;
+      }
+    };
+
+    const topic = getPersistedTopic();
+
     try {
-      // For now, we don't have the topic stored, so we'll redirect back
-      window.location.href = '/matching';
-    } catch (error) {
-      console.error('Error cancelling match:', error);
+      // First, attempt the existing helper. Cast to any to avoid strict signature issues.
+      if (typeof cancelMatch === 'function') {
+        try {
+          // common parameter orders: (userId, topic, token) or (userId, token)
+          if (topic) {
+            await (cancelMatch as any)(user.id, topic, session?.accessToken);
+          } else {
+            await (cancelMatch as any)(user.id, session?.accessToken);
+          }
+        } catch (err) {
+          // If the helper fails, fall through to a direct fetch fallback below.
+          console.warn('cancelMatch helper failed, will attempt direct fetch fallback', err);
+          throw err;
+        }
+      } else {
+        throw new Error('cancelMatch helper not available');
+      }
+    } catch (helperErr) {
+      // Fallback: call backend endpoint directly to ensure queue entry is removed.
+      try {
+        await fetch('/api/matching/cancel', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(session?.accessToken ? { Authorization: `Bearer ${session.accessToken}` } : {}),
+          },
+          body: JSON.stringify({ userId: user.id, topic }),
+        });
+      } catch (fetchErr) {
+        console.error('Failed to cancel match via fallback fetch:', fetchErr);
+      }
+    } finally {
+      // Redirect back to the matching setup regardless of cancellation outcome.
       window.location.href = '/matching';
     }
   };
