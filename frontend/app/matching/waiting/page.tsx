@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
-import { Button, Card, ConfigProvider, Layout, Progress, Space, Typography } from 'antd';
+import { useRouter } from 'next/navigation';
+import { Button, Card, ConfigProvider, Layout, Progress, Space, Typography, message } from 'antd';
 import { ClockCircleOutlined, UserOutlined } from '@ant-design/icons';
 import { useAuth } from '../../../hooks/useAuth';
 import { useRequireAuth } from '../../../hooks/useRequireAuth';
@@ -19,6 +20,7 @@ export default function MatchingWaitingPage() {
   const [matchStatus, setMatchStatus] = useState<'pending' | 'success' | 'not_found'>('pending');
   // Ensure we only redirect once when a match is ready
   const redirectingRef = useRef(false);
+  const router = useRouter();
 
   // Poll for match status
   useEffect(() => {
@@ -46,15 +48,23 @@ export default function MatchingWaitingPage() {
           redirectingRef.current = true;
           // Clear any further polling by letting cleanup run on unmount or by relying on the immediate redirect
           try {
-            if (url) {
-              window.location.href = url;
-              return;
-            }
+              if (url) {
+                // If backend returned a full URL, navigate there.
+                try {
+                  // External or internal URL
+                  router.push(url);
+                } catch (e) {
+                  // Fallback to full navigation
+                  window.location.href = url;
+                }
+                return;
+              }
 
-            if (sessionId) {
-              window.location.href = `/collaboration/${sessionId}`;
-              return;
-            }
+              if (sessionId) {
+                // Client route for sessions is /session/[sessionId]
+                router.push(`/session/${sessionId}`);
+                return;
+              }
 
             // If no redirect information is present, keep showing success state but stop re-redirect attempts
             // (You may want to fetch another endpoint here to obtain the session URL.)
@@ -126,17 +136,14 @@ export default function MatchingWaitingPage() {
     try {
       // First, attempt the existing helper. Cast to any to avoid strict signature issues.
       if (typeof cancelMatch === 'function') {
-        try {
-          // common parameter orders: (userId, topic, token) or (userId, token)
-          if (topic) {
-            await (cancelMatch as any)(user.id, topic, session?.accessToken);
-          } else {
-            await (cancelMatch as any)(user.id, session?.accessToken);
-          }
-        } catch (err) {
-          // If the helper fails, fall through to a direct fetch fallback below.
-          console.warn('cancelMatch helper failed, will attempt direct fetch fallback', err);
-          throw err;
+        // Our API helper expects (topic: string, accessToken: string)
+        if (topic) {
+          await cancelMatch(topic, session!.accessToken);
+        } else {
+          // If topic couldn't be determined, call the helper without topic is not possible;
+          // log and continue to fallback behavior below.
+          console.warn('Topic not found for cancellation; skipping API helper call');
+          throw new Error('Topic not found');
         }
       } else {
         throw new Error('cancelMatch helper not available');
@@ -144,20 +151,27 @@ export default function MatchingWaitingPage() {
     } catch (helperErr) {
       // Fallback: call backend endpoint directly to ensure queue entry is removed.
       try {
-        await fetch('/api/matching/cancel', {
-          method: 'POST',
+        // As a last resort attempt a best-effort cancel via the matching service's
+        // client-side helper endpoint. Many deployments proxy /api/matching/* to the
+        // matching service; if you don't have such a proxy, this will likely fail.
+        await fetch(`/api/matching/requests`, {
+          method: 'DELETE',
           headers: {
             'Content-Type': 'application/json',
             ...(session?.accessToken ? { Authorization: `Bearer ${session.accessToken}` } : {}),
           },
-          body: JSON.stringify({ userId: user.id, topic }),
+          body: JSON.stringify({ topic }),
         });
       } catch (fetchErr) {
         console.error('Failed to cancel match via fallback fetch:', fetchErr);
       }
     } finally {
       // Redirect back to the matching setup regardless of cancellation outcome.
-      window.location.href = '/matching';
+      try {
+        router.push('/matching');
+      } catch (e) {
+        window.location.href = '/matching';
+      }
     }
   };
 

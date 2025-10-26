@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button, Card, Col, ConfigProvider, Layout, Row, Select, Space, Typography, message } from 'antd';
 import { PlayCircleOutlined, UserOutlined, ClockCircleOutlined } from '@ant-design/icons';
 import { useAuth } from '../../hooks/useAuth';
@@ -36,6 +37,7 @@ export default function MatchingPage() {
   const [selectedDifficulty, setSelectedDifficulty] = useState<string>('');
   const [isMatching, setIsMatching] = useState(false);
   const [pollInterval, setPollInterval] = useState<NodeJS.Timeout | null>(null);
+  const router = useRouter();
 
   // Poll for match status when matching
   useEffect(() => {
@@ -46,7 +48,12 @@ export default function MatchingPage() {
           if (status.status === 'success') {
             message.success('Match found! Redirecting to collaboration...');
             setIsMatching(false);
-            // TODO: Redirect to collaboration session
+            // Note: the status endpoint does not provide the sessionId.
+            // The sessionId is returned in the POST `/requests` response when a match is
+            // created immediately. If a match is discovered via polling, the backend
+            // currently does not expose the sessionId through the status endpoint.
+            // If a sessionId were available here we would redirect using:
+            // router.push(`/session/${sessionId}`)
           } else if (status.status === 'not_found') {
             message.info('No active match request found');
             setIsMatching(false);
@@ -93,7 +100,11 @@ export default function MatchingPage() {
       if (response.status === 'success') {
         message.success('Match found! Redirecting to collaboration...');
         setIsMatching(false);
-        // TODO: Redirect to collaboration session
+        // Redirect to collaboration session if sessionId is provided by the server
+        if (response.sessionId) {
+          router.push(`/session/${response.sessionId}`);
+          return;
+        }
       } else {
         message.success(`Looking for a match in ${selectedTopic} (${selectedDifficulty})...`);
       }
