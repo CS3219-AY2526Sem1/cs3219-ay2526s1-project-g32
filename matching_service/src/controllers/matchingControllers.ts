@@ -83,11 +83,21 @@ export const createMatchRequest = async (req: AuthenticatedRequest, res: Respons
       // Create collaboration session
       const session = await createCollaborationSession(userId, matchedUser.userId, difficulty, topic);
 
-      // Set status to success only after the session is created.
-      await redisClient.set(`match_status:${userId}`, 'success');
-      await redisClient.set(`match_status:${matchedUser.userId}`, 'success');
-      
-      return res.status(200).json({ status: 'success', message: 'Match found!', sessionId: session.sessionId, matchedWith: matchedUser.userId });
+  // Persist the sessionId for both users so polling clients can retrieve it.
+  // Set a TTL to avoid stale keys lingering in Redis.
+  const sessionKeyA = `match_session:${userId}`;
+  const sessionKeyB = `match_session:${matchedUser.userId}`;
+  await redisClient.set(sessionKeyA, session.sessionId);
+  await redisClient.set(sessionKeyB, session.sessionId);
+  // expire after 5 minutes
+  await redisClient.expire(sessionKeyA, 300);
+  await redisClient.expire(sessionKeyB, 300);
+
+  // Set status to success only after the sessionId is persisted.
+  await redisClient.set(`match_status:${userId}`, 'success');
+  await redisClient.set(`match_status:${matchedUser.userId}`, 'success');
+
+  return res.status(200).json({ status: 'success', message: 'Match found!', sessionId: session.sessionId, matchedWith: matchedUser.userId });
     } else {
       console.log(`[Controller] No match found for ${userId}. Adding to queue.`);
       const newEntry: QueueEntry = { userId, difficulty, timestamp: Date.now() };
@@ -135,9 +145,15 @@ export const getMatchStatus = async (req: AuthenticatedRequest, res: Response) =
             return res.status(403).json({ message: 'Forbidden: You can only check your own match status.' });
         }
 
-        const status = await redisClient.get(`match_status:${userId}`);
-        
-        return res.status(200).json({ status: status || 'not_found' });
+  const status = await redisClient.get(`match_status:${userId}`);
+  // If a session was created, return the sessionId to the polling client so it
+  // can redirect the user into the collaboration space.
+  const sessionId = await redisClient.get(`match_session:${userId}`);
+
+  const payload: any = { status: status || 'not_found' };
+  if (sessionId) payload.sessionId = sessionId;
+
+  return res.status(200).json(payload);
 
     } catch (error: any) {
         const errorMessage = error?.message || 'Unknown error occurred';

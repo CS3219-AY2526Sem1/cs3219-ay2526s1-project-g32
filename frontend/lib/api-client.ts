@@ -124,6 +124,7 @@ export type MatchResponse = {
 
 export type MatchStatusResponse = {
   status: 'pending' | 'success' | 'not_found';
+  sessionId?: string;
 };
 
 export type CancelMatchRequest = {
