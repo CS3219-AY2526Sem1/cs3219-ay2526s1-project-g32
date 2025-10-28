@@ -31,6 +31,15 @@ CREATE TRIGGER update_questions_updated_at
     FOR EACH ROW 
     EXECUTE FUNCTION update_updated_at_column();
 
+-- Function to reset the questions ID sequence
+CREATE OR REPLACE FUNCTION reset_questions_sequence()
+RETURNS void AS $$
+BEGIN
+    -- Reset the sequence to start from 1
+    ALTER SEQUENCE questions_id_seq RESTART WITH 1;
+END;
+$$ LANGUAGE plpgsql;
+
 -- Insert some sample data
 INSERT INTO questions (title, description, difficulty, topics, image_url) VALUES 
 ('Two Sum', 'Given an array of integers nums and an integer target, return indices of the two numbers such that they add up to target.', 'Easy', ARRAY['Array', 'Hash Table'], NULL),

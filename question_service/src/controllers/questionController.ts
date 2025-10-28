@@ -118,6 +118,8 @@ export const getRandomQuestion = async (req: Request, res: Response): Promise<vo
   try {
     const { difficulty, topic } = req.query;
     
+    console.log(`[GET /random] Request params:`, { difficulty, topic });
+    
     let query = supabase
       .from('questions')
       .select('*');
@@ -131,31 +133,50 @@ export const getRandomQuestion = async (req: Request, res: Response): Promise<vo
 
     const { data, error } = await query;
     
-    if (error) throw error;
+    if (error) {
+      console.error('[GET /random] Database error:', error);
+      throw error;
+    }
+    
+    console.log(`[GET /random] Found ${data?.length || 0} matching questions`);
     
     if (!data || data.length === 0) {
-      res.status(404).json({ error: "No questions found" });
+      res.status(404).json({ 
+        error: "No questions found",
+        message: difficulty || topic 
+          ? `No questions found matching difficulty: ${difficulty || 'any'}, topic: ${topic || 'any'}`
+          : "No questions available in the database"
+      });
       return;
     }
 
     const randomIndex = Math.floor(Math.random() * data.length);
     const randomRow = data[randomIndex];
     
-    // Convert to API format
+    console.log(`[GET /random] Returning question ID: ${randomRow.id}`);
+    
+    // Convert to API format with single topic for collaboration service
     const randomQuestion = {
       id: randomRow.id,
       title: randomRow.title,
       description: randomRow.description,
       difficulty: randomRow.difficulty,
-      topics: randomRow.topics,
+      topic: randomRow.topics?.[0] || 'General', // Return first topic as string for collaboration service
+      topics: randomRow.topics, // Keep full array for backward compatibility
       image_url: randomRow.image_url,
       createdAt: new Date(randomRow.created_at),
       updatedAt: new Date(randomRow.updated_at)
     };
     
+    console.log(`[GET /random] Topic: ${randomQuestion.topic}, All topics: ${randomQuestion.topics.join(', ')}`);
+    
     res.json(randomQuestion);
   } catch (err) {
     const error = err as Error;
-    res.status(500).json({ error: error.message });
+    console.error('[GET /random] Unexpected error:', error);
+    res.status(500).json({ 
+      error: error.message,
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 };

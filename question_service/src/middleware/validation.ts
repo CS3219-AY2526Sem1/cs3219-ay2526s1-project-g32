@@ -11,8 +11,11 @@ export function validateRequest<T extends ZodSchema>(
       const dataToValidate = req[source];
       const validatedData = schema.parse(dataToValidate);
       
-      // Replace the original data with validated data
-      req[source] = validatedData;
+      // Only replace if it's body or params (query is read-only in Express 5)
+      if (source === 'body' || source === 'params') {
+        req[source] = validatedData;
+      }
+      
       next();
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -29,8 +32,17 @@ export function validateRequest<T extends ZodSchema>(
       }
       
       // Handle unexpected errors
+      console.error('[Validation Error] Unexpected error:', error);
+      console.error('[Validation Error] Request:', {
+        method: req.method,
+        path: req.path,
+        source,
+        data: req[source]
+      });
+      
       return res.status(500).json({
         error: 'Internal server error during validation',
+        message: error instanceof Error ? error.message : 'Unknown error'
       });
     }
   };
@@ -43,7 +55,7 @@ export const validateCreateQuestion = validateRequest(
     description: z.string().min(10, 'Description must be at least 10 characters').max(5000, 'Description must be less than 5000 characters').trim(),
     difficulty: z.enum(['Easy', 'Medium', 'Hard'], { message: 'Difficulty must be one of: Easy, Medium, Hard' }),
     topics: z.array(z.string().min(1, 'Topic cannot be empty').max(50, 'Topic too long')).min(1, 'At least one topic is required').max(10, 'Maximum 10 topics allowed'),
-    image_url: z.string().url('Invalid URL format').optional().or(z.literal('')).transform(val => val === '' ? undefined : val),
+    image_url: z.union([z.string().url('Invalid URL format'), z.literal(''), z.undefined()]).transform(val => val === '' || val === undefined ? undefined : val).optional(),
   }),
   'body'
 );
@@ -54,7 +66,7 @@ export const validateUpdateQuestion = validateRequest(
     description: z.string().min(10, 'Description must be at least 10 characters').max(5000, 'Description must be less than 5000 characters').trim().optional(),
     difficulty: z.enum(['Easy', 'Medium', 'Hard'], { message: 'Difficulty must be one of: Easy, Medium, Hard' }).optional(),
     topics: z.array(z.string().min(1, 'Topic cannot be empty').max(50, 'Topic too long')).min(1, 'At least one topic is required').max(10, 'Maximum 10 topics allowed').optional(),
-    image_url: z.string().url('Invalid URL format').optional().or(z.literal('')).transform(val => val === '' ? undefined : val),
+    image_url: z.union([z.string().url('Invalid URL format'), z.literal(''), z.undefined()]).transform(val => val === '' || val === undefined ? undefined : val).optional(),
   }).refine(
     (data) => Object.values(data).some(value => value !== undefined),
     { message: 'At least one field must be provided for update' }
@@ -84,6 +96,6 @@ export const validateRandomQuestionQuery = validateRequest(
   z.object({
     difficulty: z.enum(['Easy', 'Medium', 'Hard']).optional(),
     topic: z.string().optional(),
-  }),
+  }).partial(),
   'query'
 );
