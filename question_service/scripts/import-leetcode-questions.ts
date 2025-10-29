@@ -25,6 +25,8 @@ interface LeetCodeApiResponse {
 
 interface ProblemDetails {
   question: string;
+  questionLink?: string;
+  titleSlug: string;
   hints: string[];
   likes: number;
   dislikes: number;
@@ -35,11 +37,12 @@ async function fetchLeetCodeProblems(limit: number = 500, skip: number = 0): Pro
     console.log(`Fetching ${limit} problems starting from position ${skip}...`);
     
     const response = await fetch(`${LEETCODE_API_BASE}/problems?limit=${limit}&skip=${skip}`);
-    const data = await response.json() as LeetCodeApiResponse;
     
     if (!response.ok) {
       throw new Error(`API Error: ${response.status}`);
     }
+    
+    const data = await response.json() as LeetCodeApiResponse;
     
     // Filter out paid-only problems
     return data.problemsetQuestionList?.filter(problem => !problem.isPaidOnly) || [];
@@ -71,12 +74,15 @@ function mapToSupabaseFormat(problem: LeetCodeProblem, details?: ProblemDetails 
     ? cleanHtmlContent(details.question)
     : generateFallbackDescription(problem);
   
+  // Generate LeetCode problem URL as image_url (for problem reference/screenshots)
+  const problemUrl = `https://leetcode.com/problems/${problem.titleSlug}/`;
+  
   return {
     title: problem.title,
     description,
     difficulty: problem.difficulty,
     topics: problem.topicTags?.map(tag => tag.name) || ['General'],
-    image_url: undefined // Most problems don't have images
+    image_url: problemUrl // Use problem URL instead of undefined
   };
 }
 
@@ -97,6 +103,44 @@ function generateFallbackDescription(problem: LeetCodeProblem): string {
   return `This is a ${problem.difficulty.toLowerCase()} level problem focusing on: ${topics}. ` +
          `Problem ID: ${problem.questionFrontendId}. ` +
          `Solve this step by step and consider edge cases.`;
+}
+
+async function deleteAllQuestions(): Promise<void> {
+  console.log('\n🗑️  Deleting all existing questions from Supabase...');
+  
+  // Delete all rows
+  const { error } = await supabase
+    .from('questions')
+    .delete()
+    .neq('id', 0); // Delete all rows (neq with impossible condition)
+  
+  if (error) {
+    console.error('❌ Error deleting existing questions:', error);
+    throw error;
+  }
+  
+  console.log(`✅ Successfully deleted all existing questions`);
+  
+  // Reset the ID sequence to start from 1
+  console.log('🔄 Resetting ID sequence...');
+  const { error: resetError } = await supabase.rpc('reset_questions_sequence');
+  
+  if (resetError) {
+    console.warn('⚠️  Could not reset sequence via RPC, trying direct SQL...');
+    // Fallback: Use raw SQL to reset the sequence
+    const { error: sqlError } = await supabase
+      .from('questions')
+      .select('id')
+      .limit(0); // Just to execute, then we'll use a workaround
+    
+    // Note: If this fails, the sequence will continue from the last ID
+    // You may need to manually reset it in Supabase SQL editor with:
+    // ALTER SEQUENCE questions_id_seq RESTART WITH 1;
+    console.log('ℹ️  If IDs don\'t start from 1, manually run in Supabase SQL Editor:');
+    console.log('   ALTER SEQUENCE questions_id_seq RESTART WITH 1;');
+  } else {
+    console.log(`✅ Successfully reset ID sequence to start from 1`);
+  }
 }
 
 async function insertProblemsToSupabase(problems: QuestionCreationAttributes[]): Promise<void> {
@@ -186,8 +230,9 @@ async function main(): Promise<void> {
   console.log(`   Medium: ${difficultyStats.Medium}`);
   console.log(`   Hard: ${difficultyStats.Hard}`);
   
-  // Insert to Supabase
+  // Delete existing questions before inserting
   if (allProblems.length > 0) {
+    await deleteAllQuestions();
     await insertProblemsToSupabase(allProblems);
   } else {
     console.log('❌ No problems to import');
