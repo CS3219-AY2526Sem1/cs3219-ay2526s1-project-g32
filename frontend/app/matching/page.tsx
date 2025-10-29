@@ -15,15 +15,15 @@ const { Option } = Select;
 
 // Define the available topics and difficulties
 const TOPICS = [
-  'Arrays',
-  'Strings', 
-  'Linked Lists',
-  'Trees',
+  'Array',
+  'String', 
+  'Linked List',
+  'Tree',
   'Graphs',
   'Dynamic Programming',
   'Sorting',
   'Searching',
-  'Hash Tables',
+  'Hash Table',
   'Stacks and Queues'
 ];
 

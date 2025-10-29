@@ -5,7 +5,8 @@
     "user_service",
     "matching_service",
     "frontend",
-    "collaboration_service"
+    "collaboration_service",
+    "question_service"
   ],
   "devDependencies": {
     "@types/express": "^5.0.3",
@@ -13,5 +14,8 @@
     "@types/react": "^19.1.13",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "esbuild": "^0.25.11"
   }
 }

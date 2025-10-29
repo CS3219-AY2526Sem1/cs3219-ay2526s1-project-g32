@@ -7,15 +7,15 @@ const difficultyEnum = z.enum(['Easy', 'Medium', 'Hard'], {
 
 // Define valid topics (you can expand this list)
 const topicEnum = z.enum([
-  'Arrays', 
-  'Strings', 
-  'Linked Lists', 
-  'Trees', 
+  'Array', 
+  'String', 
+  'Linked List', 
+  'Tree', 
   'Graphs', 
   'Dynamic Programming',
   'Sorting',
   'Searching',
-  'Hash Tables',
+  'Hash Table',
   'Stacks and Queues'
 ], {
   message: 'Invalid topic selected'

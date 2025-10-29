@@ -7,6 +7,7 @@ import {
   SessionTokenRequestSchema,
 } from '../schemas';
 import type { SessionManager } from '../services/sessionManager';
+import { diff } from 'util';
 
 export class SessionController {
   constructor(
@@ -37,6 +38,7 @@ export class SessionController {
 
   private async fetchQuestion(topic: string, difficulty: string) {
     const url = new URL('questions/random', this.questionServiceBaseUrl);
+    difficulty = difficulty.charAt(0).toUpperCase() + difficulty.slice(1);
     url.searchParams.set('topic', topic);
     url.searchParams.set('difficulty', difficulty);
 
