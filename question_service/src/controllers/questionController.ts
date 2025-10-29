@@ -168,7 +168,7 @@ export const getRandomQuestion = async (req: Request, res: Response): Promise<vo
       updatedAt: new Date(randomRow.updated_at)
     };
     
-    console.log(`[GET /random] Topic: ${randomQuestion.topic}, All topics: ${randomQuestion.topics.join(', ')}`);
+    console.log(`[GET /random] Topic: ${randomQuestion.topic}, All topics: ${randomQuestion.topics.join(', ') ?? 'None'}`);
     
     res.json(randomQuestion);
   } catch (err) {

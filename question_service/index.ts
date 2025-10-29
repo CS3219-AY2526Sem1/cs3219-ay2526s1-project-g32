@@ -8,15 +8,15 @@ dotenv.config();
 
 const app = express();
 
-// Enable CORS for all routes
-app.use(cors({
-  origin: process.env.CORS_ORIGIN || '*', // Configure in .env for production
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
+// // Enable CORS for all routes
+// app.use(cors({
+//   origin: process.env.CORS_ORIGIN || '*', // Configure in .env for production
+//   methods: ['GET', 'POST', 'PUT', 'DELETE'],
+//   allowedHeaders: ['Content-Type', 'Authorization']
+// }));
 
 app.use(express.json());
-app.use("/questions", questionRoutes);
+app.use("/api/v1/questions", questionRoutes);
 
 const PORT = process.env.PORT || 3001;
 
