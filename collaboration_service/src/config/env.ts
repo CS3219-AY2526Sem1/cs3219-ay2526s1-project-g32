@@ -8,7 +8,7 @@ const envSchema = z.object({
   PORT: z.string().optional(),
   HOST: z.string().optional(),
   REDIS_URL: z.string().url().default('redis://localhost:6379'),
-  QUESTION_SERVICE_URL: z.string().url().default('http://localhost:3001/api/v1/'),
+  QUESTION_SERVICE_URL: z.string().url().default('http://localhost:4003/api/v1/'),
   USER_SERVICE_URL: z.string().url().default('http://localhost:4001/api/v1/'),
   JWT_SECRET: z.string().min(1, 'JWT_SECRET is required').default('dev-change-me'),
   SESSION_TOKEN_TTL_SECONDS: z.string().optional(),
