@@ -7,12 +7,35 @@ import { CreateMatchRequest, DeleteMatchRequest } from '../validation/matchingSc
 import { AuthenticatedRequest } from '../middleware/authenticate';
 
 // --- Inter-Service Communication ---
-const COLLABORATION_SERVICE_URL = process.env.COLLABORATION_SERVICE_URL || 'http://localhost:3001/api/v1/collaborations';
+const COLLABORATION_SERVICE_URL = process.env.COLLABORATION_SERVICE_URL || 'http://localhost:4010/api/v1/sessions';
 
+/**
+ * Creates a collaboration session by calling the collaboration service.
+ * Formats the request according to the collaboration service's SessionCreateSchema.
+ */
 async function createCollaborationSession(user1Id: string, user2Id: string, difficulty: string, topic: string) {
   try {
-    const response = await axios.post(COLLABORATION_SERVICE_URL, { user1Id, user2Id, difficulty, topic });
-    console.log('[Controller] Successfully created collaboration session.');
+    // Generate a unique match ID for this session
+    const matchId = `match-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+    
+    // Convert difficulty to lowercase format expected by collaboration service
+    const normalizedDifficulty = difficulty.toLowerCase();
+    
+    // Format payload according to SessionCreateSchema
+    const sessionPayload = {
+      matchId,
+      topic,
+      difficulty: normalizedDifficulty,
+      participants: [
+        { userId: user1Id },
+        { userId: user2Id }
+      ]
+    };
+
+    console.log(`[Controller] Creating collaboration session for match ${matchId} with payload:`, sessionPayload);
+    
+    const response = await axios.post(COLLABORATION_SERVICE_URL, sessionPayload);
+    console.log('[Controller] Successfully created collaboration session:', response.data);
     return response.data;
   } catch (error: any) {
     let errorMessage = 'Unknown error';
@@ -37,7 +60,7 @@ async function createCollaborationSession(user1Id: string, user2Id: string, diff
     // CRITICAL: Re-queue both users if the collaboration service fails.
     await queueService.addToFrontOfQueue({ userId: user1Id, difficulty, timestamp: Date.now() }, topic);
     await queueService.addToFrontOfQueue({ userId: user2Id, difficulty, timestamp: Date.now() }, topic);
-    console.log(`[Controller] Re-queued users ${user1Id} and ${user2Id} due to collaboration service error.`);
+    console.log(`[Controller] Re-queued users ${user1Id} and ${user2Id} due to collaboration service error: ${errorMessage}`);
     throw new Error('Failed to create collaboration session.');
   }
 }
@@ -57,13 +80,24 @@ export const createMatchRequest = async (req: AuthenticatedRequest, res: Respons
     if (matchedUser) {
       console.log(`[Controller] Match found for ${userId}! Matched with ${matchedUser.userId}.`);
       
+      // Create collaboration session
       const session = await createCollaborationSession(userId, matchedUser.userId, difficulty, topic);
 
-      // Set status to success only after the session is created.
-      await redisClient.set(`match_status:${userId}`, 'success');
-      await redisClient.set(`match_status:${matchedUser.userId}`, 'success');
-      
-      return res.status(200).json({ status: 'success', message: 'Match found!', sessionId: session.sessionId, matchedWith: matchedUser.userId });
+  // Persist the sessionId for both users so polling clients can retrieve it.
+  // Set a TTL to avoid stale keys lingering in Redis.
+  const sessionKeyA = `match_session:${userId}`;
+  const sessionKeyB = `match_session:${matchedUser.userId}`;
+  await redisClient.set(sessionKeyA, session.sessionId);
+  await redisClient.set(sessionKeyB, session.sessionId);
+  // expire after 5 minutes
+  await redisClient.expire(sessionKeyA, 300);
+  await redisClient.expire(sessionKeyB, 300);
+
+  // Set status to success only after the sessionId is persisted.
+  await redisClient.set(`match_status:${userId}`, 'success');
+  await redisClient.set(`match_status:${matchedUser.userId}`, 'success');
+
+  return res.status(200).json({ status: 'success', message: 'Match found!', sessionId: session.sessionId, matchedWith: matchedUser.userId });
     } else {
       console.log(`[Controller] No match found for ${userId}. Adding to queue.`);
       const newEntry: QueueEntry = { userId, difficulty, timestamp: Date.now() };
@@ -111,9 +145,15 @@ export const getMatchStatus = async (req: AuthenticatedRequest, res: Response) =
             return res.status(403).json({ message: 'Forbidden: You can only check your own match status.' });
         }
 
-        const status = await redisClient.get(`match_status:${userId}`);
-        
-        return res.status(200).json({ status: status || 'not_found' });
+  const status = await redisClient.get(`match_status:${userId}`);
+  // If a session was created, return the sessionId to the polling client so it
+  // can redirect the user into the collaboration space.
+  const sessionId = await redisClient.get(`match_session:${userId}`);
+
+  const payload: any = { status: status || 'not_found' };
+  if (sessionId) payload.sessionId = sessionId;
+
+  return res.status(200).json(payload);
 
     } catch (error: any) {
         const errorMessage = error?.message || 'Unknown error occurred';

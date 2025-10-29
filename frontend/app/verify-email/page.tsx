@@ -6,6 +6,7 @@ import type { Route } from 'next';
 import { Alert, Button, Card, ConfigProvider, Typography, Space } from 'antd';
 
 import { resendMagicLink } from '../../lib/api-client';
+import { authTheme } from '../../lib/theme';
 
 const LOGIN_ROUTE = '/login' as Route;
 const { Title, Paragraph, Text } = Typography;
@@ -38,45 +39,23 @@ export default function VerifyEmailPage() {
   }, [email]);
 
   return (
-    <ConfigProvider
-      theme={{
-        token: {
-          colorPrimary: '#137fec',
-          colorBgBase: '#0A1017',
-          colorTextBase: '#ffffff',
-          colorBorder: 'rgba(255,255,255,0.1)',
-          fontFamily:
-            '"Space Grotesk","Noto Sans",system-ui,-apple-system,"Segoe UI",sans-serif',
-        },
-        components: {
-          Card: {
-            colorBgContainer: 'rgba(255,255,255,0.04)',
-            headerBg: 'transparent',
-            headerPadding: 0,
-          },
-          Button: {
-            borderRadius: 10,
-            fontWeight: 600,
-          },
-          Typography: {},
-        },
-      }}
-    >
-      {/* Brand header (reuses .auth-header) */}
-      <header className="auth-header">
-        <svg
-          width="32"
-          height="32"
-          viewBox="0 0 48 48"
-          fill="none"
-          style={{ color: '#137fec' }}
-          xmlns="http://www.w3.org/2000/svg"
-          aria-hidden="true"
-        >
-          <path d="M6 6H42L36 24L42 42H6L12 24L6 6Z" fill="currentColor" />
-        </svg>
-        <Title level={3} style={{ margin: 0 }}>PeerPrep</Title>
-      </header>
+    <ConfigProvider theme={authTheme}>
+      <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
+        {/* Brand header (reuses .auth-header) */}
+        <header className="auth-header">
+          <svg
+            width="32"
+            height="32"
+            viewBox="0 0 48 48"
+            fill="none"
+            style={{ color: '#6366F1' }}
+            xmlns="http://www.w3.org/2000/svg"
+            aria-hidden="true"
+          >
+            <path d="M6 6H42L36 24L42 42H6L12 24L6 6Z" fill="currentColor" />
+          </svg>
+          <Title level={3} style={{ margin: 0 }}>PeerPrep</Title>
+        </header>
 
       <div className="auth-shell">
         <Card className="auth-card" bordered>
@@ -124,6 +103,7 @@ export default function VerifyEmailPage() {
             </Space>
           </div>
         </Card>
+      </div>
       </div>
     </ConfigProvider>
   );
