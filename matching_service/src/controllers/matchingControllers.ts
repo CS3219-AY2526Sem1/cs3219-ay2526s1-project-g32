@@ -75,6 +75,7 @@ export const createMatchRequest = async (req: AuthenticatedRequest, res: Respons
 
     console.log(`[Controller] Received match request from ${userId} for topic "${topic}" with difficulty "${difficulty}".`);
     await redisClient.set(`match_status:${userId}`, 'pending');
+    await redisClient.del(`match_session:${userId}`);
     const matchedUser = await queueService.findMatchInQueue(difficulty, topic);
 
     if (matchedUser) {
@@ -83,27 +84,31 @@ export const createMatchRequest = async (req: AuthenticatedRequest, res: Respons
       // Create collaboration session
       const session = await createCollaborationSession(userId, matchedUser.userId, difficulty, topic);
 
-  // Persist the sessionId for both users so polling clients can retrieve it.
-  // Set a TTL to avoid stale keys lingering in Redis.
-  const sessionKeyA = `match_session:${userId}`;
-  const sessionKeyB = `match_session:${matchedUser.userId}`;
-  await redisClient.set(sessionKeyA, session.sessionId);
-  await redisClient.set(sessionKeyB, session.sessionId);
-  // expire after 5 minutes
-  await redisClient.expire(sessionKeyA, 300);
-  await redisClient.expire(sessionKeyB, 300);
+      // Persist the sessionId for both users so polling clients can retrieve it.
+      // Set a TTL to avoid stale keys lingering in Redis.
+      const sessionKeyA = `match_session:${userId}`;
+      const sessionKeyB = `match_session:${matchedUser.userId}`;
+      await redisClient.set(sessionKeyA, session.sessionId);
+      await redisClient.set(sessionKeyB, session.sessionId);
+      // expire after 5 minutes
+      await redisClient.expire(sessionKeyA, 300);
+      await redisClient.expire(sessionKeyB, 300);
 
-  // Set status to success only after the sessionId is persisted.
-  await redisClient.set(`match_status:${userId}`, 'success');
-  await redisClient.set(`match_status:${matchedUser.userId}`, 'success');
+      // Set status to success only after the sessionId is persisted.
+      await redisClient.set(`match_status:${userId}`, 'success');
+      await redisClient.set(`match_status:${matchedUser.userId}`, 'success');
 
-  return res.status(200).json({ status: 'success', message: 'Match found!', sessionId: session.sessionId, matchedWith: matchedUser.userId });
+      return res.status(200).json({ status: 'success', message: 'Match found!', sessionId: session.sessionId, matchedWith: matchedUser.userId });
     } else {
       console.log(`[Controller] No match found for ${userId}. Adding to queue.`);
       const newEntry: QueueEntry = { userId, difficulty, timestamp: Date.now() };
       await queueService.addToQueue(newEntry, topic);
       timeoutService.scheduleTimeoutCheck(newEntry);
-      return res.status(202).json({ status: 'pending', message: 'No match found at this time. You have been added to the queue.' });
+      return res.status(202).json({
+        status: 'pending',
+        message: 'No match found at this time. You have been added to the queue.',
+        requestId: `${userId}:${topic}:${difficulty}`,
+      });
     }
   } catch (error: any) {
     const errorMessage = error?.message || 'Unknown error occurred';
@@ -121,6 +126,7 @@ export const deleteMatchRequest = async (req: AuthenticatedRequest, res: Respons
         console.log(`[Controller] Received cancellation request from ${userId} for topic "${topic}".`);
         await queueService.removeFromQueue(userId, topic);
         await redisClient.del(`match_status:${userId}`);
+        await redisClient.del(`match_session:${userId}`);
         
         return res.status(200).json({ message: 'You have been removed from the queue.' });
 
@@ -146,12 +152,16 @@ export const getMatchStatus = async (req: AuthenticatedRequest, res: Response) =
         }
 
   const status = await redisClient.get(`match_status:${userId}`);
-  // If a session was created, return the sessionId to the polling client so it
-  // can redirect the user into the collaboration space.
-  const sessionId = await redisClient.get(`match_session:${userId}`);
+  let sessionId: string | null = null;
 
-  const payload: any = { status: status || 'not_found' };
-  if (sessionId) payload.sessionId = sessionId;
+  if (status === 'success') {
+    sessionId = await redisClient.get(`match_session:${userId}`);
+  }
+
+  const payload: Record<string, unknown> = { status: status || 'not_found' };
+  if (sessionId) {
+    payload.sessionId = sessionId;
+  }
 
   return res.status(200).json(payload);
 
@@ -178,8 +188,9 @@ export const handleRequeue = async (req: Request, res: Response) => {
         // Schedule a new timeout check for the re-queued user.
         timeoutService.scheduleTimeoutCheck(entry);
         
-        // Set status back to 'pending' for the re-queued user.
+        // Set status back to 'pending' for the re-queued user and clear any stale session mapping.
         await redisClient.set(`match_status:${userId}`, 'pending');
+        await redisClient.del(`match_session:${userId}`);
 
         return res.status(200).json({ message: 'User has been re-queued successfully.' });
 

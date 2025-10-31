@@ -1,5 +1,5 @@
 import cors from 'cors';
-import type { Application, NextFunction, Request, Response } from 'express';
+import type { Application, NextFunction, Request, Response, RequestHandler} from 'express';
 import express from 'express';
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
@@ -34,14 +34,12 @@ export const buildApp = (deps: RouteDependencies): Application => {
 
   app.use(morgan(config.nodeEnv === 'production' ? 'combined' : 'dev'));
 
-  app.use(
-    rateLimit({
-      windowMs: 60 * 1000,
-      max: 1000,
-      standardHeaders: true,
-      legacyHeaders: false,
-    }),
-  );
+  app.use(rateLimit({
+    windowMs: 60 * 1000,
+    max: 10,
+    standardHeaders: true,
+    legacyHeaders: false,
+  }) as unknown as RequestHandler);
 
   registerRoutes(app, deps);
 

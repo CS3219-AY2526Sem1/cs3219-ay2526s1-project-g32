@@ -125,6 +125,7 @@ class TimeoutService {
             }
             
             await redisClient.del(`match_status:${userId}`);
+            await redisClient.del(`match_session:${userId}`);
             console.log(`[TimeoutService] Cleaned up expired user ${userId}. Total entries removed: ${removedCount}.`);
           } else {
             console.log(`[TimeoutService] User ${userId} is no longer pending. No action taken.`);
