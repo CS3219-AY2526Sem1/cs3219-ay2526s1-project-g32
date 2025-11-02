@@ -8,9 +8,9 @@ export const EnvSchema = z.object({
   
   // Supabase Configuration
   SUPABASE_URL: z.string().url('Invalid Supabase URL'),
-  SUPABASE_ANON_KEY: z.string().min(1, 'Supabase anon key is required'),
+  SUPABASE_ANON_KEY: z.string().min(1, 'Supabase anon key is required').optional(),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1, 'Supabase service role key is required'),
-  SUPABASE_JWT_SECRET: z.string().min(1, 'Supabase JWT secret is required'),
+  SUPABASE_JWT_SECRET: z.string().min(1, 'Supabase JWT secret is required').optional(),
   
   // Logging Configuration
   LOG_LEVEL: z.string().optional(),

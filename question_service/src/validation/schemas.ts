@@ -17,32 +17,43 @@ export const TopicsArraySchema = z.array(TopicSchema)
 export const CreateQuestionSchema = z.object({
   title: z.string()
     .min(1, 'Title is required')
-    .max(200, 'Title must be less than 200 characters')
+    .trim(),
+  slug: z.string()
+    .min(1, 'Slug is required')
     .trim(),
   description: z.string()
     .min(10, 'Description must be at least 10 characters')
-    .max(5000, 'Description must be less than 5000 characters')
     .trim(),
-  difficulty: DifficultySchema,
+  difficulty: z.string().min(1, 'Difficulty is required'),
   topics: TopicsArraySchema,
-  image_url: z.string().url('Invalid URL format').optional().or(z.literal('')).transform(val => val === '' ? undefined : val),
+  starter_python: z.string().optional(),
+  starter_c: z.string().optional(),
+  starter_cpp: z.string().optional(),
+  starter_java: z.string().optional(),
+  starter_javascript: z.string().optional(),
 });
 
 // Question update schema (all fields optional except at least one must be provided)
 export const UpdateQuestionSchema = z.object({
   title: z.string()
     .min(1, 'Title cannot be empty')
-    .max(200, 'Title must be less than 200 characters')
+    .trim()
+    .optional(),
+  slug: z.string()
+    .min(1, 'Slug cannot be empty')
     .trim()
     .optional(),
   description: z.string()
     .min(10, 'Description must be at least 10 characters')
-    .max(5000, 'Description must be less than 5000 characters')
     .trim()
     .optional(),
-  difficulty: DifficultySchema.optional(),
+  difficulty: z.string().min(1, 'Difficulty cannot be empty').optional(),
   topics: TopicsArraySchema.optional(),
-  image_url: z.string().url('Invalid URL format').optional().or(z.literal('')).transform(val => val === '' ? undefined : val),
+  starter_python: z.string().optional(),
+  starter_c: z.string().optional(),
+  starter_cpp: z.string().optional(),
+  starter_java: z.string().optional(),
+  starter_javascript: z.string().optional(),
 }).refine(
   (data) => Object.values(data).some(value => value !== undefined),
   { message: 'At least one field must be provided for update' }
@@ -51,7 +62,7 @@ export const UpdateQuestionSchema = z.object({
 // Query parameters schema for filtering questions
 export const GetQuestionsQuerySchema = z.object({
   title: z.string().optional(),
-  difficulty: DifficultySchema.optional(),
+  difficulty: z.string().optional(),
   topic: z.string().optional(),
   limit: z.string().regex(/^\d+$/, 'Limit must be a positive number').transform(Number).refine(n => n > 0 && n <= 100, 'Limit must be between 1 and 100').optional(),
   offset: z.string().regex(/^\d+$/, 'Offset must be a non-negative number').transform(Number).refine(n => n >= 0, 'Offset must be non-negative').optional(),
@@ -59,7 +70,7 @@ export const GetQuestionsQuerySchema = z.object({
 
 // Random question query schema
 export const GetRandomQuestionQuerySchema = z.object({
-  difficulty: DifficultySchema.optional(),
+  difficulty: z.string().optional(),
   topic: z.string().optional(),
 });
 
