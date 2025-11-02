@@ -18,4 +18,8 @@
   "dependencies": {
     "esbuild": "^0.25.11"
   }
+  ,
+  "scripts": {
+    "dev:matching_service": "npm --prefix matching_service run dev"
+  }
 }
