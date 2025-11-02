@@ -303,10 +303,26 @@ Content-Type: application/json
    cd ../user_service && npm run dev
    ```
 
-4. **Start the Matching Service:**
-   ```bash
-   npm start
-   ```
+4. **Start the Matching Service**
+
+You can start the matching service in multiple ways depending on where you want to run the command from:
+
+- From inside the `matching_service` folder (traditional):
+  ```bash
+  # from matching_service/
+  npm run dev      # or `npm start`
+  ```
+
+- From the repository root (recommended for monorepo/workspace workflows):
+  ```bash
+  # exact command supported by this repository
+  npm run dev --workspace matching_service
+  ```
+
+- Alternatively, the repository provides a root-level proxy script you can use:
+  ```bash
+  npm run dev:matching_service
+  ```
 
 The service will be running at `http://localhost:3000`.
 

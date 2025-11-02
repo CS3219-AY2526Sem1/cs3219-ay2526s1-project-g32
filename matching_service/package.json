@@ -1,10 +1,11 @@
 {
-  "name": "matching-service",
+  "name": "matching_service",
   "version": "1.0.0",
   "description": "PeerPrep Matching Service",
   "main": "index.ts",
   "scripts": {
-    "start": "npx ts-node src/index.ts"
+    "start": "npx ts-node src/index.ts",
+    "dev": "npx ts-node src/index.ts"
   },
   "dependencies": {
     "@types/cors": "^2.8.19",
