@@ -5,11 +5,13 @@ Service responsible for managing coding questions, including CRUD operations, fi
 ## Features Implemented
 
 - **Question CRUD API** – Full create, read, update, and delete operations for coding questions with Zod validation.
+- **Multi-language starter code** – Support for Python, C, C++, Java, and JavaScript starter code templates.
 - **Advanced filtering** – Query questions by title, difficulty level, and topics with optimized database indexes.
 - **Random question selection** – `GET /api/v1/questions/random` returns a random question based on optional difficulty and topic filters, used by matching service.
 - **LeetCode import script** – Automated import of 1000+ LeetCode-style questions from external API with detailed descriptions, topics, and difficulty levels.
-- **Supabase integration** – PostgreSQL database hosted on Supabase with full TypeScript type safety and migration support.
+- **Supabase integration** – PostgreSQL database (questionsv3 table) hosted on Supabase with full TypeScript type safety.
 - **CORS support** – Configured for cross-origin requests from frontend and other microservices.
+- **Pino logging** – Structured JSON logging with configurable log levels for debugging and monitoring.
 
 ## Project Structure
 
@@ -70,9 +72,13 @@ question_service/
 | Variable | Default | Description |
 | --- | --- | --- |
 | `PORT` | `3001` | HTTP port for the question service. |
+| `NODE_ENV` | `development` | Environment mode (development, production, test). |
 | `SUPABASE_URL` | (required) | Your Supabase project URL. |
 | `SUPABASE_SERVICE_ROLE_KEY` | (required) | Service role key for server-side access. |
-| `CORS_ORIGIN` | `*` | Allowed CORS origins (configure for production). |
+| `SUPABASE_ANON_KEY` | (optional) | Supabase anonymous key (not used by this service). |
+| `SUPABASE_JWT_SECRET` | (optional) | JWT secret for token validation (not used by this service). |
+| `CORS_ALLOWED_ORIGINS` | `http://localhost:3000` | Comma-separated list of allowed CORS origins. |
+| `LOG_LEVEL` | `debug` (dev) / `info` (prod) | Logging verbosity level. |
 
 ## REST API Summary
 
@@ -93,36 +99,55 @@ All questions return data in the following format:
 {
   "id": 1,
   "title": "Two Sum",
+  "slug": "two-sum",
   "description": "Given an array of integers nums and an integer target...",
   "difficulty": "Easy",
   "topic": "Array",
   "topics": ["Array", "Hash Table"],
-  "image_url": "https://leetcode.com/problems/two-sum/",
-  "createdAt": "2025-10-29T...",
-  "updatedAt": "2025-10-29T..."
+  "starterCode": {
+    "python": "def twoSum(nums: List[int], target: int) -> List[int]:\n    pass",
+    "c": "int* twoSum(int* nums, int numsSize, int target, int* returnSize) {\n    \n}",
+    "cpp": "class Solution {\npublic:\n    vector<int> twoSum(vector<int>& nums, int target) {\n        \n    }\n};",
+    "java": "class Solution {\n    public int[] twoSum(int[] nums, int target) {\n        \n    }\n}",
+    "javascript": "var twoSum = function(nums, target) {\n    \n};"
+  }
 }
 ```
 
-> Note: The `topic` field (singular) returns the first topic for compatibility with collaboration service, while `topics` contains the full array.
+> **Note:** The `topic` field (singular) returns the first topic for compatibility with collaboration service, while `topics` contains the full array. Image URLs are embedded in the description field.
 
 ## Database Schema
 
+The service uses the `questionsv3` table in Supabase:
+
 ```sql
-CREATE TABLE questions (
+CREATE TABLE questionsv3 (
   id SERIAL PRIMARY KEY,
-  title VARCHAR(255) NOT NULL,
-  description TEXT NOT NULL,
-  difficulty VARCHAR(10) NOT NULL CHECK (difficulty IN ('Easy', 'Medium', 'Hard')),
+  title TEXT NOT NULL,
+  slug TEXT NOT NULL UNIQUE,
+  difficulty TEXT NOT NULL,
   topics TEXT[] NOT NULL,
-  image_url VARCHAR(500),
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  description TEXT NOT NULL,
+  starter_python TEXT,
+  starter_c TEXT,
+  starter_cpp TEXT,
+  starter_java TEXT,
+  starter_javascript TEXT
 );
 
 -- Indexes for optimized queries
-CREATE INDEX idx_questions_difficulty ON questions(difficulty);
-CREATE INDEX idx_questions_topics ON questions USING GIN(topics);
+CREATE INDEX idx_questionsv3_difficulty ON questionsv3(difficulty);
+CREATE INDEX idx_questionsv3_topics ON questionsv3 USING GIN(topics);
+CREATE INDEX idx_questionsv3_slug ON questionsv3(slug);
 ```
+
+**Key Changes from Previous Schema:**
+- Table name: `questions` → `questionsv3`
+- Added `slug` field for URL-friendly identifiers
+- Added starter code fields for 5 programming languages
+- Removed `image_url` column (URLs now embedded in description)
+- Removed timestamp columns (`created_at`, `updated_at`)
+- Changed `title` and `difficulty` from VARCHAR to TEXT
 
 ## Scripts
 
@@ -155,11 +180,12 @@ This script will:
 
 All endpoints use Zod for runtime type validation:
 
-- **Title:** 1-200 characters
-- **Description:** 10-5000 characters
-- **Difficulty:** Must be one of `Easy`, `Medium`, or `Hard`
+- **Title:** Required, minimum 1 character
+- **Slug:** Required, minimum 1 character, URL-friendly format
+- **Description:** Required, minimum 10 characters
+- **Difficulty:** Required text field (typically Easy, Medium, or Hard)
 - **Topics:** Array of 1-10 strings (each 1-50 characters)
-- **Image URL:** Optional valid URL
+- **Starter Code:** Optional text fields for Python, C, C++, Java, and JavaScript
 
 Invalid requests return 400 with detailed error messages:
 
@@ -182,20 +208,44 @@ Invalid requests return 400 with detailed error messages:
 The matching service calls `GET /api/v1/questions/random?difficulty={difficulty}` to select an appropriate question for matched users.
 
 ### Collaboration Service
-The collaboration service uses the returned `topic` field (singular string) to identify the question category for the coding session.
+The collaboration service receives:
+- The `topic` field (singular string) to identify the question category
+- The `starterCode` object with language-specific templates for the collaborative editor
+- The full question description with embedded image URLs
 
 ### User Service
 Future integration planned for question authorship, favorites, and completion tracking.
+
+## Topic Parsing
+
+The service handles topics stored in multiple formats:
+- **PostgreSQL Array:** `{"Array", "Hash Table"}`
+- **JSON String:** `"[\"Array\", \"Hash Table\"]"`
+- **Single String:** `"Array"`
+
+The `parseTopics()` helper function automatically detects and parses the format, ensuring consistent array output regardless of storage format.
+
+## Recent Updates (November 2025)
+
+- **Migrated to questionsv3 table** with improved schema design
+- **Added multi-language starter code** support (Python, C, C++, Java, JavaScript)
+- **Added slug field** for URL-friendly question identifiers
+- **Removed timestamps** (created_at, updated_at) to simplify schema
+- **Embedded image URLs** in description instead of separate column
+- **Added Pino structured logging** for better observability
+- **Fixed query parameter validation** to handle empty requests
+- **Improved topic parsing** to handle multiple storage formats
 
 ## What's Next
 
 - Add question authorship and ownership tracking
 - Implement user-specific question history and completion status
 - Add test case storage and validation for questions
-- Support for multiple programming languages per question
+- Support for additional programming languages (Go, Rust, TypeScript, etc.)
 - Question difficulty rating based on user feedback
 - Full-text search across question titles and descriptions
 - Question versioning and edit history
+- Enhanced LeetCode import with all descriptions and solution hints
 
 ## References
 
