@@ -36,7 +36,7 @@ export const buildApp = (deps: RouteDependencies): Application => {
 
   app.use(rateLimit({
     windowMs: 60 * 1000,
-    max: 10,
+    max: 30,
     standardHeaders: true,
     legacyHeaders: false,
   }) as unknown as RequestHandler);

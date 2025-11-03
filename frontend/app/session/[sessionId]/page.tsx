@@ -99,6 +99,7 @@ export default function SessionPage({ params }: { params: { sessionId: string } 
   const pendingLanguageRef = useRef<string | null>(null);
   const isMountedRef = useRef(true);
   const basePresenceRef = useRef<Record<string, { name: string; connected: boolean }>>({});
+  const pendingBindLanguageRef = useRef<string | null>(null);
 
   useEffect(() => {
     return () => {
@@ -239,6 +240,43 @@ export default function SessionPage({ params }: { params: { sessionId: string } 
     [setPresenceMap],
   );
 
+  const bindEditorToLanguage = useCallback(
+    (language: string) => {
+      const normalized = normalizeLanguage(language);
+      const editor = editorRef.current;
+      const monaco = monacoRef.current;
+      const entry = languageEntriesRef.current[normalized];
+
+      if (!entry || !editor || !monaco) {
+        pendingBindLanguageRef.current = normalized;
+        return false;
+      }
+
+    pendingBindLanguageRef.current = null;
+
+    let model = languageModelsRef.current[normalized];
+    if (!model) {
+        model = monaco.editor.createModel('', resolveMonacoLanguage(normalized));
+        languageModelsRef.current[normalized] = model;
+      }
+
+      if (editor.getModel() !== model) {
+      editor.setModel(model);
+    }
+
+    bindingRef.current?.destroy();
+    bindingRef.current = new MonacoBinding(entry.text, model, new Set([editor]), entry.provider.awareness);
+    const providerState =
+      (entry.provider as unknown as { synced?: boolean }).synced === true || entry.provider.wsconnected
+        ? 'connected'
+        : 'connecting';
+    setConnectionStatus(providerState);
+    updatePresenceForLanguage(normalized);
+    return true;
+  },
+  [updatePresenceForLanguage],
+);
+
   const ensureLanguageEntry = useCallback(
     (language: string): LanguageDocEntry | null => {
       const normalized = normalizeLanguage(language);
@@ -302,6 +340,7 @@ export default function SessionPage({ params }: { params: { sessionId: string } 
         if (!isSynced) {
           return;
         }
+        bindEditorToLanguage(normalized);
         handlePresenceUpdate();
       };
 
@@ -320,13 +359,20 @@ export default function SessionPage({ params }: { params: { sessionId: string } 
       languageEntriesRef.current[normalized] = entry;
 
       if (currentLanguageRef.current === normalized) {
-        setConnectionStatus(provider.wsconnected ? 'connected' : 'connecting');
+        const bound = bindEditorToLanguage(normalized);
+        if (!bound) {
+          setConnectionStatus(provider.wsconnected ? 'connected' : 'connecting');
+        }
         handlePresenceUpdate();
+      }
+
+      if (currentLanguageRef.current === normalized && provider.wsconnected) {
+        setConnectionStatus('connected');
       }
 
       return entry;
     },
-    [localDisplayName, updatePresenceForLanguage, user],
+    [bindEditorToLanguage, localDisplayName, updatePresenceForLanguage, user],
   );
 
   const applyLanguageSwitch = useCallback(
@@ -338,14 +384,12 @@ export default function SessionPage({ params }: { params: { sessionId: string } 
       currentLanguageRef.current = normalized;
       setCurrentLanguage(normalized);
       const entry = ensureLanguageEntry(normalized);
-      if (entry) {
-        setConnectionStatus(entry.provider.wsconnected ? 'connected' : 'connecting');
-        updatePresenceForLanguage(normalized);
-      } else {
+      const bound = bindEditorToLanguage(normalized);
+      if (!entry || !bound) {
         setConnectionStatus('connecting');
       }
     },
-    [ensureLanguageEntry, updatePresenceForLanguage],
+    [bindEditorToLanguage, ensureLanguageEntry],
   );
 
   const handleLanguageChange = useCallback(
@@ -487,53 +531,33 @@ export default function SessionPage({ params }: { params: { sessionId: string } 
       return;
     }
 
-    const language = currentLanguageRef.current;
-    const existingEntry = languageEntriesRef.current[language];
-    const entry = existingEntry ?? ensureLanguageEntry(language);
-    if (!entry) {
-      setConnectionStatus('connecting');
-      return;
-    }
-
-    let model = languageModelsRef.current[language];
-    if (!model) {
-      model = monaco.editor.createModel('', resolveMonacoLanguage(language));
-      languageModelsRef.current[language] = model;
-    }
-
-    if (editor.getModel() !== model) {
-      editor.setModel(model);
-    }
-
-    bindingRef.current?.destroy();
-    bindingRef.current = new MonacoBinding(entry.text, model, new Set([editor]), entry.provider.awareness);
-    setConnectionStatus(entry.provider.wsconnected ? 'connected' : 'connecting');
-    updatePresenceForLanguage(language);
-
-    return () => {
-      bindingRef.current?.destroy();
-      bindingRef.current = null;
-    };
-  }, [currentLanguage, ensureLanguageEntry, sessionToken, sessionSnapshot, updatePresenceForLanguage]);
-
-  useEffect(() => {
-    const editor = editorRef.current;
-    const monaco = monacoRef.current;
-    if (!editor || !monaco) {
-      return;
-    }
-
     const model = editor.getModel();
     if (model) {
       monaco.editor.setModelLanguage(model, resolveMonacoLanguage(currentLanguage));
     }
   }, [currentLanguage]);
 
-  const handleEditorMount = useCallback((editor: MonacoEditorNS.IStandaloneCodeEditor, monaco: Monaco) => {
-    editorRef.current = editor;
-    monacoRef.current = monaco;
-    setTimeout(() => editor.layout(), 0);
-  }, []);
+  useEffect(() => {
+    const targetLanguage = pendingBindLanguageRef.current ?? currentLanguageRef.current;
+    const entry = ensureLanguageEntry(targetLanguage);
+    if (entry) {
+      const bound = bindEditorToLanguage(targetLanguage);
+      if (!bound) {
+        setConnectionStatus('connecting');
+      }
+    }
+  }, [bindEditorToLanguage, ensureLanguageEntry, sessionSnapshot, sessionToken]);
+
+  const handleEditorMount = useCallback(
+    (editor: MonacoEditorNS.IStandaloneCodeEditor, monaco: Monaco) => {
+      editorRef.current = editor;
+      monacoRef.current = monaco;
+      setTimeout(() => editor.layout(), 0);
+      const language = currentLanguageRef.current;
+      bindEditorToLanguage(language);
+    },
+    [bindEditorToLanguage],
+  );
 
   const questionContent = useMemo(() => {
     const snapshot = sessionSnapshot;
