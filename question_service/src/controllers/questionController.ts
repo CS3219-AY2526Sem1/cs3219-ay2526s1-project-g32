@@ -2,12 +2,12 @@ import { Request, Response } from "express";
 import QuestionService, { QuestionCreationAttributes } from "../models/Question";
 import supabase from "../models/db";
 import { logger } from "../utils/logger";
-import { 
-  CreateQuestionInput, 
-  UpdateQuestionInput, 
-  GetQuestionsQuery, 
+import {
+  CreateQuestionInput,
+  UpdateQuestionInput,
+  GetQuestionsQuery,
   GetRandomQuestionQuery,
-  QuestionIdParam 
+  QuestionIdParam,
 } from "../validation/schemas";
 
 // Helper function to parse topics - handles both array and JSON string formats
@@ -22,6 +22,23 @@ function parseTopics(topics: any): string[] {
     } catch {
       return [topics];
     }
+  }
+  return [];
+}
+
+function normalizeTopicFilters(topic: unknown): string[] {
+  if (!topic) {
+    return [];
+  }
+  if (Array.isArray(topic)) {
+    return topic
+      .map((value) => (typeof value === 'string' ? value : String(value)))
+      .map((value) => value.trim())
+      .filter(Boolean);
+  }
+  if (typeof topic === 'string') {
+    const trimmed = topic.trim();
+    return trimmed ? [trimmed] : [];
   }
   return [];
 }
@@ -53,7 +70,8 @@ export const createQuestion = async (req: Request, res: Response): Promise<void>
 export const getQuestions = async (req: Request, res: Response): Promise<void> => {
   try {
     const { title, difficulty, topic } = req.query;
-    
+    const topicFilters = normalizeTopicFilters(topic);
+
     let query = supabase
       .from('questionsv3')
       .select('*')
@@ -65,16 +83,21 @@ export const getQuestions = async (req: Request, res: Response): Promise<void> =
     if (difficulty) {
       query = query.eq('difficulty', difficulty);
     }
-    if (topic) {
-      query = query.contains('topics', [topic]);
-    }
 
     const { data, error } = await query;
-    
+
     if (error) throw error;
     
     // Convert to API format
-    const questions = data?.map(row => ({
+    const filteredData =
+      topicFilters.length === 0
+        ? data
+        : data?.filter((row) => {
+            const normalizedTopics = parseTopics(row.topics);
+            return topicFilters.some((filterTopic) => normalizedTopics.includes(filterTopic));
+          });
+
+    const questions = filteredData?.map(row => ({
       id: row.id,
       title: row.title,
       slug: row.slug,
@@ -150,9 +173,10 @@ export const deleteQuestion = async (req: Request, res: Response): Promise<void>
 export const getRandomQuestion = async (req: Request, res: Response): Promise<void> => {
   try {
     const { difficulty, topic } = req.query;
-    
+    const topicFilters = normalizeTopicFilters(topic);
+
     logger.info({ difficulty, topic }, '[GET /random] Request params');
-    
+
     let query = supabase
       .from('questionsv3')
       .select('*');
@@ -160,12 +184,9 @@ export const getRandomQuestion = async (req: Request, res: Response): Promise<vo
     if (difficulty) {
       query = query.eq('difficulty', difficulty);
     }
-    if (topic) {
-      query = query.contains('topics', [topic]);
-    }
 
     const { data, error } = await query;
-    
+
     if (error) {
       logger.error({ error }, '[GET /random] Database error');
       throw error;
@@ -176,16 +197,36 @@ export const getRandomQuestion = async (req: Request, res: Response): Promise<vo
     if (!data || data.length === 0) {
       res.status(404).json({ 
         error: "No questions found",
-        message: difficulty || topic 
-          ? `No questions found matching difficulty: ${difficulty || 'any'}, topic: ${topic || 'any'}`
+        message: difficulty || topicFilters.length > 0
+          ? `No questions found matching difficulty: ${difficulty || 'any'}, topic: ${topicFilters.join(', ') || 'any'}`
           : "No questions available in the database"
       });
       return;
     }
 
-    const randomIndex = Math.floor(Math.random() * data.length);
-    const randomRow = data[randomIndex];
-    
+    const filtered =
+      topicFilters.length === 0
+        ? data
+        : data.filter((row) => {
+            const normalizedTopics = parseTopics(row.topics);
+            return topicFilters.some((filterTopic) => normalizedTopics.includes(filterTopic));
+          });
+
+    if (!filtered || filtered.length === 0) {
+      res.status(404).json({
+        error: "No questions found",
+        message:
+          topicFilters.length > 0
+            ? `No questions found matching difficulty: ${difficulty || 'any'}, topic: ${topicFilters.join(', ')}`
+            : `No questions found matching difficulty: ${difficulty || 'any'}`,
+      });
+      return;
+    }
+
+    logger.info({ count: filtered.length }, '[GET /random] Filtered by topics');
+
+    const randomIndex = Math.floor(Math.random() * filtered.length);
+    const randomRow = filtered[randomIndex];
     logger.info({ questionId: randomRow.id }, '[GET /random] Returning question');
     
     // Parse topics from JSON string or array

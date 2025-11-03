@@ -1,7 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Monaco } from '@monaco-editor/react';
 import { MonacoBinding } from 'y-monaco';
@@ -39,7 +39,13 @@ const { Title, Text, Paragraph } = Typography;
 
 const MonacoEditor = dynamic(() => import('@monaco-editor/react'), { ssr: false });
 
-const LANGUAGE_OPTIONS = [
+type LanguageOption = {
+  label: string;
+  value: string;
+  disabled?: boolean;
+};
+
+const BASE_LANGUAGE_OPTIONS: LanguageOption[] = [
   { label: 'JavaScript', value: 'javascript' },
   { label: 'Python', value: 'python' },
   { label: 'Java', value: 'java' },
@@ -47,7 +53,8 @@ const LANGUAGE_OPTIONS = [
   { label: 'C++', value: 'cpp' },
 ];
 
-const SUPPORTED_LANGUAGES = new Set(LANGUAGE_OPTIONS.map((option) => option.value));
+const BASE_LANGUAGE_ORDER = BASE_LANGUAGE_OPTIONS.map((option) => option.value);
+const SUPPORTED_LANGUAGES = new Set(BASE_LANGUAGE_ORDER);
 
 const NORMALIZE_LANGUAGE_MAP: Record<string, string> = {
   typescript: 'javascript',
@@ -93,7 +100,8 @@ export default function SessionPage({ params }: { params: { sessionId: string } 
   const monacoRef = useRef<Monaco | null>(null);
   const bindingRef = useRef<MonacoBinding | null>(null);
   const providerRef = useRef<WebsocketProvider | null>(null);
-  const initializedRef = useRef(false);
+  const previousLanguageRef = useRef<string | null>(null);
+  const languageContentRef = useRef<Record<string, string>>({});
 
   const localDisplayName = useMemo(() => {
     if (!user) return undefined;
@@ -111,11 +119,54 @@ export default function SessionPage({ params }: { params: { sessionId: string } 
     return base ? `${base}/session/${params.sessionId}` : `/session/${params.sessionId}`;
   }, [params.sessionId]);
 
+  const questionLanguageSet = useMemo(() => {
+    if (!sessionSnapshot) return new Set<string>();
+    const starterCode = sessionSnapshot.question.starterCode ?? {};
+    const languages = Object.entries(starterCode)
+      .filter(([, value]) => typeof value === 'string' && value.trim().length > 0)
+      .map(([key]) => normalizeLanguage(key));
+    return new Set(languages);
+  }, [sessionSnapshot]);
+
+  const languageOptions = useMemo(() => {
+    const hasStrictLanguages = questionLanguageSet.size > 0;
+    const options: LanguageOption[] = BASE_LANGUAGE_OPTIONS.map((option) => ({
+      ...option,
+      disabled: hasStrictLanguages && !questionLanguageSet.has(option.value) && option.value !== currentLanguage,
+    }));
+
+    if (hasStrictLanguages) {
+      questionLanguageSet.forEach((language) => {
+        if (!options.some((option) => option.value === language)) {
+          options.push({
+            label: language.charAt(0).toUpperCase() + language.slice(1),
+            value: language,
+            disabled: false,
+          });
+        }
+      });
+    }
+
+    return options.sort((a, b) => {
+      const aDisabled = Boolean(a.disabled);
+      const bDisabled = Boolean(b.disabled);
+      if (aDisabled !== bDisabled) {
+        return aDisabled ? 1 : -1;
+      }
+      const aIndex = BASE_LANGUAGE_ORDER.indexOf(a.value);
+      const bIndex = BASE_LANGUAGE_ORDER.indexOf(b.value);
+      const safeA = aIndex === -1 ? Number.MAX_SAFE_INTEGER : aIndex;
+      const safeB = bIndex === -1 ? Number.MAX_SAFE_INTEGER : bIndex;
+      return safeA - safeB;
+    });
+  }, [currentLanguage, questionLanguageSet]);
+
   useEffect(() => () => ydoc.destroy(), [ydoc]);
 
   useEffect(() => {
-    initializedRef.current = false;
-  }, [params.sessionId]);
+    previousLanguageRef.current = null;
+    languageContentRef.current = {};
+  }, [params.sessionId, sessionSnapshot?.sessionId]);
 
   useEffect(() => {
     if (!sessionSnapshot) {
@@ -179,7 +230,14 @@ export default function SessionPage({ params }: { params: { sessionId: string } 
         if (cancelled) return;
         setSessionSnapshot(session);
 
-        const defaultLanguage = normalizeLanguage(Object.keys(session.question.starterCode ?? {}).find(Boolean));
+        const snippetLanguages = Array.from(
+          new Set(
+            Object.entries(session.question.starterCode ?? {})
+              .filter(([, value]) => typeof value === 'string' && value && value.trim().length > 0)
+              .map(([key]) => normalizeLanguage(key)),
+          ),
+        );
+        const defaultLanguage = snippetLanguages[0] ?? 'javascript';
         if (!settingsMap.has('language')) {
           settingsMap.set('language', defaultLanguage);
         } else {
@@ -357,20 +415,60 @@ export default function SessionPage({ params }: { params: { sessionId: string } 
     });
   }, [currentLanguage]);
 
+  const getStarterCode = useCallback(
+    (language: string): string | undefined => {
+      if (!sessionSnapshot) {
+        return undefined;
+      }
+      const target = normalizeLanguage(language);
+      const starterRecord = sessionSnapshot.question.starterCode ?? {};
+      for (const [key, value] of Object.entries(starterRecord)) {
+        if (normalizeLanguage(key) === target && typeof value === 'string' && value.trim().length > 0) {
+          return value;
+        }
+      }
+      return undefined;
+    },
+    [sessionSnapshot],
+  );
+
   useEffect(() => {
     if (!sessionSnapshot) {
       return;
     }
 
-    const initialCode =
-      sessionSnapshot.question.starterCode?.[currentLanguage] ??
-      sessionSnapshot.question.starterCode?.[resolveMonacoLanguage(currentLanguage)];
+    const docText = yText.toString();
+    const previousLanguage = previousLanguageRef.current;
 
-    if (!initializedRef.current && typeof initialCode === 'string' && yText.length === 0) {
-      yText.insert(0, initialCode);
-      initializedRef.current = true;
+    if (previousLanguage && previousLanguage !== currentLanguage) {
+      languageContentRef.current[previousLanguage] = docText;
     }
-  }, [currentLanguage, sessionSnapshot, yText]);
+
+    const storedContent = languageContentRef.current[currentLanguage];
+    const starterContent = getStarterCode(currentLanguage);
+
+    const nextContent =
+      storedContent !== undefined
+        ? storedContent
+        : starterContent !== undefined
+        ? starterContent
+        : docText;
+
+    if (docText !== nextContent) {
+      ydoc.transact(() => {
+        yText.delete(0, yText.length);
+        if (nextContent) {
+          yText.insert(0, nextContent);
+        }
+      });
+    }
+
+    if (typeof nextContent === 'string') {
+      languageContentRef.current[currentLanguage] = nextContent;
+    }
+
+    previousLanguageRef.current = currentLanguage;
+  }, [currentLanguage, getStarterCode, sessionSnapshot, yText, ydoc]);
 
   const handleEditorMount = (editor: MonacoEditorNS.IStandaloneCodeEditor, monaco: Monaco) => {
     editorRef.current = editor;
@@ -680,9 +778,15 @@ export default function SessionPage({ params }: { params: { sessionId: string } 
                       popupMatchSelectWidth={false}
                       dropdownStyle={{ background: '#fff', color: '#000' }}
                     >
-                      {LANGUAGE_OPTIONS.map((option) => (
-                        <Select.Option key={option.value} value={option.value} style={{ color: '#000' }}>
+                      {languageOptions.map((option) => (
+                        <Select.Option
+                          key={option.value}
+                          value={option.value}
+                          style={{ color: '#000' }}
+                          disabled={option.disabled}
+                        >
                           {option.label}
+                          {option.disabled ? ' (not provided)' : ''}
                         </Select.Option>
                       ))}
                     </Select>

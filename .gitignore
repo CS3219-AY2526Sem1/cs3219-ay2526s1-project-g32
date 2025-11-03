@@ -4,6 +4,7 @@ node_modules
 user_service/dist/
 question_service/dist/
 collaboration_service/dist/
+matching_service/dist/
 frontend/.next/
 frontend/out/
 frontend/.env.local
