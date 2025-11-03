@@ -97,13 +97,11 @@ export default function SessionPage({ params }: { params: { sessionId: string } 
   const languageEntriesRef = useRef<Record<string, LanguageDocEntry>>({});
   const languageModelsRef = useRef<Record<string, MonacoEditorNS.ITextModel>>({});
   const pendingLanguageRef = useRef<string | null>(null);
-  const isMountedRef = useRef(true);
   const basePresenceRef = useRef<Record<string, { name: string; connected: boolean }>>({});
   const pendingBindLanguageRef = useRef<string | null>(null);
 
   useEffect(() => {
     return () => {
-      isMountedRef.current = false;
       bindingRef.current?.destroy();
       bindingRef.current = null;
       if (stateProviderCleanupRef.current) {
@@ -282,6 +280,13 @@ export default function SessionPage({ params }: { params: { sessionId: string } 
       const normalized = normalizeLanguage(language);
       const existing = languageEntriesRef.current[normalized];
       if (existing) {
+        if (currentLanguageRef.current === normalized) {
+          const bound = bindEditorToLanguage(normalized);
+          if (!bound) {
+            setConnectionStatus(existing.provider.wsconnected ? 'connected' : 'connecting');
+          }
+          updatePresenceForLanguage(normalized);
+        }
         return existing;
       }
 
@@ -384,12 +389,11 @@ export default function SessionPage({ params }: { params: { sessionId: string } 
       currentLanguageRef.current = normalized;
       setCurrentLanguage(normalized);
       const entry = ensureLanguageEntry(normalized);
-      const bound = bindEditorToLanguage(normalized);
-      if (!entry || !bound) {
+      if (!entry) {
         setConnectionStatus('connecting');
       }
     },
-    [bindEditorToLanguage, ensureLanguageEntry],
+    [ensureLanguageEntry],
   );
 
   const handleLanguageChange = useCallback(
@@ -540,13 +544,10 @@ export default function SessionPage({ params }: { params: { sessionId: string } 
   useEffect(() => {
     const targetLanguage = pendingBindLanguageRef.current ?? currentLanguageRef.current;
     const entry = ensureLanguageEntry(targetLanguage);
-    if (entry) {
-      const bound = bindEditorToLanguage(targetLanguage);
-      if (!bound) {
-        setConnectionStatus('connecting');
-      }
+    if (!entry) {
+      setConnectionStatus('connecting');
     }
-  }, [bindEditorToLanguage, ensureLanguageEntry, sessionSnapshot, sessionToken]);
+  }, [ensureLanguageEntry, sessionSnapshot, sessionToken]);
 
   const handleEditorMount = useCallback(
     (editor: MonacoEditorNS.IStandaloneCodeEditor, monaco: Monaco) => {
@@ -649,6 +650,28 @@ export default function SessionPage({ params }: { params: { sessionId: string } 
       </ConfigProvider>
     );
   }
+
+  if (error) {
+    return (
+      <ConfigProvider theme={peerPrepTheme}>
+        <Layout style={{ minHeight: '100vh', background: 'var(--bg)' }}>
+          <Content className="main-content">
+            <Result
+              status="error"
+              title="Unable to load collaboration session"
+              subTitle={error}
+              extra={
+                <Button type="primary" onClick={() => router.refresh()}>
+                  Retry
+                </Button>
+              }
+            />
+          </Content>
+        </Layout>
+      </ConfigProvider>
+    );
+  }
+
   const sessionTitle =
     sessionSnapshot
       ? sessionSnapshot.question?.title ??
