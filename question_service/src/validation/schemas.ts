@@ -24,7 +24,7 @@ export const CreateQuestionSchema = z.object({
   description: z.string()
     .min(10, 'Description must be at least 10 characters')
     .trim(),
-  difficulty: z.string().min(1, 'Difficulty is required'),
+  difficulty: DifficultySchema,
   topics: TopicsArraySchema,
   starter_python: z.string().optional(),
   starter_c: z.string().optional(),
@@ -47,7 +47,7 @@ export const UpdateQuestionSchema = z.object({
     .min(10, 'Description must be at least 10 characters')
     .trim()
     .optional(),
-  difficulty: z.string().min(1, 'Difficulty cannot be empty').optional(),
+  difficulty: DifficultySchema.optional(),
   topics: TopicsArraySchema.optional(),
   starter_python: z.string().optional(),
   starter_c: z.string().optional(),
@@ -62,7 +62,7 @@ export const UpdateQuestionSchema = z.object({
 // Query parameters schema for filtering questions
 export const GetQuestionsQuerySchema = z.object({
   title: z.string().optional(),
-  difficulty: z.string().optional(),
+  difficulty: DifficultySchema.optional(),
   topic: z.string().optional(),
   limit: z.string().regex(/^\d+$/, 'Limit must be a positive number').transform(Number).refine(n => n > 0 && n <= 100, 'Limit must be between 1 and 100').optional(),
   offset: z.string().regex(/^\d+$/, 'Offset must be a non-negative number').transform(Number).refine(n => n >= 0, 'Offset must be non-negative').optional(),
@@ -70,7 +70,7 @@ export const GetQuestionsQuerySchema = z.object({
 
 // Random question query schema
 export const GetRandomQuestionQuerySchema = z.object({
-  difficulty: z.string().optional(),
+  difficulty: DifficultySchema.optional(),
   topic: z.string().optional(),
 });
 
