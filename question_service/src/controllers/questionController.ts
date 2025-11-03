@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import QuestionService, { QuestionCreationAttributes } from "../models/Question";
 import supabase from "../models/db";
+import { logger } from "../utils/logger";
 import { 
   CreateQuestionInput, 
   UpdateQuestionInput, 
@@ -9,11 +10,38 @@ import {
   QuestionIdParam 
 } from "../validation/schemas";
 
+// Helper function to parse topics - handles both array and JSON string formats
+function parseTopics(topics: any): string[] {
+  if (Array.isArray(topics)) {
+    return topics;
+  }
+  if (typeof topics === 'string') {
+    try {
+      const parsed = JSON.parse(topics);
+      return Array.isArray(parsed) ? parsed : [topics];
+    } catch {
+      return [topics];
+    }
+  }
+  return [];
+}
+
 // Create a new question
 export const createQuestion = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { title, description, difficulty, topics, image_url } = req.body;
-    const question = await QuestionService.create({ title, description, difficulty, topics, image_url });
+    const { title, slug, description, difficulty, topics, starter_python, starter_c, starter_cpp, starter_java, starter_javascript } = req.body;
+    const question = await QuestionService.create({ 
+      title, 
+      slug, 
+      description, 
+      difficulty, 
+      topics, 
+      starter_python, 
+      starter_c, 
+      starter_cpp, 
+      starter_java, 
+      starter_javascript 
+    });
     res.status(201).json(question);
   } catch (err) {
     const error = err as Error;
@@ -27,9 +55,9 @@ export const getQuestions = async (req: Request, res: Response): Promise<void> =
     const { title, difficulty, topic } = req.query;
     
     let query = supabase
-      .from('questions')
+      .from('questionsv3')
       .select('*')
-      .order('created_at', { ascending: false });
+      .order('id', { ascending: true });
 
     if (title) {
       query = query.ilike('title', `%${title}%`);
@@ -49,12 +77,17 @@ export const getQuestions = async (req: Request, res: Response): Promise<void> =
     const questions = data?.map(row => ({
       id: row.id,
       title: row.title,
-      description: row.description,
+      slug: row.slug,
       difficulty: row.difficulty,
-      topics: row.topics,
-      image_url: row.image_url,
-      createdAt: new Date(row.created_at),
-      updatedAt: new Date(row.updated_at)
+      topics: parseTopics(row.topics),
+      description: row.description,
+      starterCode: {
+        python: row.starter_python,
+        c: row.starter_c,
+        cpp: row.starter_cpp,
+        java: row.starter_java,
+        javascript: row.starter_javascript
+      }
     })) || [];
     
     res.json(questions);
@@ -118,10 +151,10 @@ export const getRandomQuestion = async (req: Request, res: Response): Promise<vo
   try {
     const { difficulty, topic } = req.query;
     
-    console.log(`[GET /random] Request params:`, { difficulty, topic });
+    logger.info({ difficulty, topic }, '[GET /random] Request params');
     
     let query = supabase
-      .from('questions')
+      .from('questionsv3')
       .select('*');
     
     if (difficulty) {
@@ -134,11 +167,11 @@ export const getRandomQuestion = async (req: Request, res: Response): Promise<vo
     const { data, error } = await query;
     
     if (error) {
-      console.error('[GET /random] Database error:', error);
+      logger.error({ error }, '[GET /random] Database error');
       throw error;
     }
     
-    console.log(`[GET /random] Found ${data?.length || 0} matching questions`);
+    logger.info({ count: data?.length || 0 }, '[GET /random] Found matching questions');
     
     if (!data || data.length === 0) {
       res.status(404).json({ 
@@ -153,27 +186,35 @@ export const getRandomQuestion = async (req: Request, res: Response): Promise<vo
     const randomIndex = Math.floor(Math.random() * data.length);
     const randomRow = data[randomIndex];
     
-    console.log(`[GET /random] Returning question ID: ${randomRow.id}`);
+    logger.info({ questionId: randomRow.id }, '[GET /random] Returning question');
+    
+    // Parse topics from JSON string or array
+    const parsedTopics = parseTopics(randomRow.topics);
     
     // Convert to API format with single topic for collaboration service
     const randomQuestion = {
       id: randomRow.id,
       title: randomRow.title,
+      slug: randomRow.slug,
       description: randomRow.description,
       difficulty: randomRow.difficulty,
-      topic: randomRow.topics?.[0] || 'General', // Return first topic as string for collaboration service
-      topics: randomRow.topics, // Keep full array for backward compatibility
-      image_url: randomRow.image_url,
-      createdAt: new Date(randomRow.created_at),
-      updatedAt: new Date(randomRow.updated_at)
+      topic: parsedTopics[0] || 'General', // Return first topic as clean string for collaboration service
+      topics: parsedTopics, // Keep full array for backward compatibility
+      starterCode: {
+        python: randomRow.starter_python,
+        c: randomRow.starter_c,
+        cpp: randomRow.starter_cpp,
+        java: randomRow.starter_java,
+        javascript: randomRow.starter_javascript
+      }
     };
     
-    console.log(`[GET /random] Topic: ${randomQuestion.topic}, All topics: ${randomQuestion.topics.join(', ') ?? 'None'}`);
+    logger.info({ topic: randomQuestion.topic, allTopics: randomQuestion.topics }, '[GET /random] Topic selection');
     
     res.json(randomQuestion);
   } catch (err) {
     const error = err as Error;
-    console.error('[GET /random] Unexpected error:', error);
+    logger.error({ error: error.message, stack: error.stack }, '[GET /random] Unexpected error');
     res.status(500).json({ 
       error: error.message,
       details: process.env.NODE_ENV === 'development' ? error.stack : undefined

@@ -1,52 +1,70 @@
 import supabase from "./db";
 
-// Database row interface (matches Supabase table structure)
+// Database row interface (matches Supabase questionsv3 table structure)
 export interface QuestionRow {
   id: number;
   title: string;
-  description: string;
-  difficulty: "Easy" | "Medium" | "Hard";
+  slug: string;
+  difficulty: string;
   topics: string[];
-  image_url?: string;
-  created_at: string;
-  updated_at: string;
+  description: string;
+  starter_python?: string;
+  starter_c?: string;
+  starter_cpp?: string;
+  starter_java?: string;
+  starter_javascript?: string;
 }
 
 // API interface (for requests/responses)
 export interface QuestionAttributes {
   id: number;
   title: string;
-  description: string;
-  difficulty: "Easy" | "Medium" | "Hard";
+  slug: string;
+  difficulty: string;
   topics: string[];
-  image_url?: string;
-  createdAt: Date;
-  updatedAt: Date;
+  description: string;
+  starterCode?: {
+    python?: string;
+    c?: string;
+    cpp?: string;
+    java?: string;
+    javascript?: string;
+  };
 }
 
 export interface QuestionCreationAttributes {
   title: string;
-  description: string;
-  difficulty: "Easy" | "Medium" | "Hard";
+  slug: string;
+  difficulty: string;
   topics: string[];
-  image_url?: string;
+  description: string;
+  starter_python?: string;
+  starter_c?: string;
+  starter_cpp?: string;
+  starter_java?: string;
+  starter_javascript?: string;
 }
 
 // Question service class for Supabase operations
 export class QuestionService {
-  private static readonly tableName = 'questions';
+  private static readonly tableName = 'questionsv3';
 
   // Convert database row to API format
   private static mapRowToAttributes(row: QuestionRow): QuestionAttributes {
     return {
       id: row.id,
       title: row.title,
-      description: row.description,
+      slug: row.slug,
       difficulty: row.difficulty,
       topics: row.topics,
-      image_url: row.image_url,
-      createdAt: new Date(row.created_at),
-      updatedAt: new Date(row.updated_at)
+      description: row.description,
+      starterCode: {
+        python: row.starter_python,
+        c: row.starter_c,
+        cpp: row.starter_cpp,
+        java: row.starter_java,
+        javascript: row.starter_javascript
+      }
     };
   }
 
@@ -55,7 +73,7 @@ export class QuestionService {
     const { data, error } = await supabase
       .from(this.tableName)
       .select('*')
-      .order('created_at', { ascending: false });
+      .order('id', { ascending: true });
 
     if (error) throw error;
     return data?.map(this.mapRowToAttributes) || [];

@@ -17,32 +17,43 @@ export const TopicsArraySchema = z.array(TopicSchema)
 export const CreateQuestionSchema = z.object({
   title: z.string()
     .min(1, 'Title is required')
-    .max(200, 'Title must be less than 200 characters')
+    .trim(),
+  slug: z.string()
+    .min(1, 'Slug is required')
     .trim(),
   description: z.string()
     .min(10, 'Description must be at least 10 characters')
-    .max(5000, 'Description must be less than 5000 characters')
     .trim(),
   difficulty: DifficultySchema,
   topics: TopicsArraySchema,
-  image_url: z.string().url('Invalid URL format').optional().or(z.literal('')).transform(val => val === '' ? undefined : val),
+  starter_python: z.string().optional(),
+  starter_c: z.string().optional(),
+  starter_cpp: z.string().optional(),
+  starter_java: z.string().optional(),
+  starter_javascript: z.string().optional(),
 });
 
 // Question update schema (all fields optional except at least one must be provided)
 export const UpdateQuestionSchema = z.object({
   title: z.string()
     .min(1, 'Title cannot be empty')
-    .max(200, 'Title must be less than 200 characters')
+    .trim()
+    .optional(),
+  slug: z.string()
+    .min(1, 'Slug cannot be empty')
     .trim()
     .optional(),
   description: z.string()
     .min(10, 'Description must be at least 10 characters')
-    .max(5000, 'Description must be less than 5000 characters')
     .trim()
     .optional(),
   difficulty: DifficultySchema.optional(),
   topics: TopicsArraySchema.optional(),
-  image_url: z.string().url('Invalid URL format').optional().or(z.literal('')).transform(val => val === '' ? undefined : val),
+  starter_python: z.string().optional(),
+  starter_c: z.string().optional(),
+  starter_cpp: z.string().optional(),
+  starter_java: z.string().optional(),
+  starter_javascript: z.string().optional(),
 }).refine(
   (data) => Object.values(data).some(value => value !== undefined),
   { message: 'At least one field must be provided for update' }
