@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import QuestionService, { QuestionCreationAttributes } from "../models/Question";
 import supabase from "../models/db";
+import { logger } from "../utils/logger";
 import { 
   CreateQuestionInput, 
   UpdateQuestionInput, 
@@ -150,7 +151,7 @@ export const getRandomQuestion = async (req: Request, res: Response): Promise<vo
   try {
     const { difficulty, topic } = req.query;
     
-    console.log(`[GET /random] Request params:`, { difficulty, topic });
+    logger.info({ difficulty, topic }, '[GET /random] Request params');
     
     let query = supabase
       .from('questionsv3')
@@ -166,11 +167,11 @@ export const getRandomQuestion = async (req: Request, res: Response): Promise<vo
     const { data, error } = await query;
     
     if (error) {
-      console.error('[GET /random] Database error:', error);
+      logger.error({ error }, '[GET /random] Database error');
       throw error;
     }
     
-    console.log(`[GET /random] Found ${data?.length || 0} matching questions`);
+    logger.info({ count: data?.length || 0 }, '[GET /random] Found matching questions');
     
     if (!data || data.length === 0) {
       res.status(404).json({ 
@@ -185,7 +186,7 @@ export const getRandomQuestion = async (req: Request, res: Response): Promise<vo
     const randomIndex = Math.floor(Math.random() * data.length);
     const randomRow = data[randomIndex];
     
-    console.log(`[GET /random] Returning question ID: ${randomRow.id}`);
+    logger.info({ questionId: randomRow.id }, '[GET /random] Returning question');
     
     // Parse topics from JSON string or array
     const parsedTopics = parseTopics(randomRow.topics);
@@ -208,12 +209,12 @@ export const getRandomQuestion = async (req: Request, res: Response): Promise<vo
       }
     };
     
-    console.log(`[GET /random] Topic: ${randomQuestion.topic}, All topics: ${randomQuestion.topics.join(', ')}`);
+    logger.info({ topic: randomQuestion.topic, allTopics: randomQuestion.topics }, '[GET /random] Topic selection');
     
     res.json(randomQuestion);
   } catch (err) {
     const error = err as Error;
-    console.error('[GET /random] Unexpected error:', error);
+    logger.error({ error: error.message, stack: error.stack }, '[GET /random] Unexpected error');
     res.status(500).json({ 
       error: error.message,
       details: process.env.NODE_ENV === 'development' ? error.stack : undefined

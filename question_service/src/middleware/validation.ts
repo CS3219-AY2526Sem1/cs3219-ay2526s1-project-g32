@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { z, ZodSchema } from 'zod';
+import { logger } from '../utils/logger';
 import {
   CreateQuestionSchema,
   UpdateQuestionSchema,
@@ -39,13 +40,13 @@ export function validateRequest<T extends ZodSchema>(
       }
       
       // Handle unexpected errors
-      console.error('[Validation Error] Unexpected error:', error);
-      console.error('[Validation Error] Request:', {
+      logger.error({
+        error: error instanceof Error ? error.message : 'Unknown error',
         method: req.method,
         path: req.path,
         source,
         data: req[source]
-      });
+      }, '[Validation Error] Unexpected error');
       
       return res.status(500).json({
         error: 'Internal server error during validation',
