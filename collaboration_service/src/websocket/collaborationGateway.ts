@@ -15,6 +15,7 @@ type SessionTokenClaims = JwtPayload & {
 type SessionContext = {
   sessionId: string;
   userId: string;
+  docName: string;
 };
 
 interface UpgradeRequest extends IncomingMessage {
@@ -66,7 +67,7 @@ const normalizePath = (path: string) => {
   return path.endsWith('/') ? path.slice(0, -1) : path;
 };
 
-const parseSessionId = (pathname: string, basePath: string): string | null => {
+const parseSessionPath = (pathname: string, basePath: string): { sessionId: string; docName: string } | null => {
   const normalizedBase = normalizePath(basePath);
   const normalizedPath = normalizePath(pathname);
 
@@ -80,7 +81,15 @@ const parseSessionId = (pathname: string, basePath: string): string | null => {
   }
 
   const segments = remainder.split('/').filter(Boolean);
-  return segments.length > 0 ? segments[0] : null;
+  if (segments.length === 0) {
+    return null;
+  }
+
+  const [sessionId, ...docSegments] = segments;
+  const docName =
+    docSegments.length > 0 ? `${sessionId}/${docSegments.join('/')}` : `${sessionId}/state`;
+
+  return { sessionId, docName };
 };
 
 const verifyToken = (token: string, sessionId: string, secret: string) => {
@@ -120,19 +129,20 @@ const authenticateUpgrade = async (
     return null;
   }
 
-  const sessionId = parseSessionId(requestUrl.pathname, options.path);
-  if (!sessionId) {
+  const parsed = parseSessionPath(requestUrl.pathname, options.path);
+  if (!parsed) {
     return null;
   }
+  const { sessionId, docName } = parsed;
 
   const token = extractToken(req);
   if (!token) {
     return null;
   }
 
-  let context: SessionContext;
+  let authContext: { sessionId: string; userId: string };
   try {
-    context = verifyToken(token, sessionId, options.jwtSecret);
+    authContext = verifyToken(token, sessionId, options.jwtSecret);
   } catch (error) {
     logger.warn({ err: error }, 'Failed to verify session token');
     return null;
@@ -147,12 +157,12 @@ const authenticateUpgrade = async (
     return null;
   }
 
-  const participant = session.participants.find((p) => p.userId === context.userId);
+  const participant = session.participants.find((p) => p.userId === authContext.userId);
   if (!participant) {
     return null;
   }
 
-  return context;
+  return { sessionId: authContext.sessionId, userId: authContext.userId, docName };
 };
 
 export const attachCollaborationGateway = (server: HttpServer, options: CollaborationGatewayOptions) => {
@@ -167,8 +177,9 @@ export const attachCollaborationGateway = (server: HttpServer, options: Collabor
       return;
     }
 
-    const { sessionId, userId } = context;
-    const docName = `${docPrefix}${sessionId}`;
+    const { sessionId, userId, docName } = context;
+    const fullDocName = docName.startsWith(`${sessionId}/`) ? docName : `${sessionId}/${docName}`;
+    const yDocName = `${docPrefix}${fullDocName}`;
 
     const recordConnected = () =>
       options.sessionManager
@@ -202,7 +213,7 @@ export const attachCollaborationGateway = (server: HttpServer, options: Collabor
       void recordConnected();
     });
 
-    setupWSConnection(ws, request, { docName, gc: true });
+    setupWSConnection(ws, request, { docName: yDocName, gc: true });
   });
 
   server.on('upgrade', (req: UpgradeRequest, socket, head) => {

@@ -4,6 +4,12 @@ import { v4 as uuidv4 } from 'uuid';
 import type { QuestionSnapshot, SessionCreatePayload, SessionSnapshot, SessionTokenRequest } from '../types';
 import { SessionSnapshotSchema } from '../schemas';
 import type { PresenceRepository, SessionRepository } from '../repositories';
+import type { WSSharedDoc } from '@y/websocket-server/utils';
+import { getYDoc } from '@y/websocket-server/utils';
+import { logger } from '../utils/logger';
+
+const DEFAULT_LANGUAGES = ['javascript', 'python', 'java', 'c', 'cpp'] as const;
+const normalizeLanguage = (language: string) => language.toLowerCase();
 
 export interface SessionManagerOptions {
   gracePeriodMs: number;
@@ -23,13 +29,32 @@ export class SessionManager {
     const now = new Date();
     const expiresAt = new Date(now.getTime() + this.options.gracePeriodMs);
 
+    const starterCode = question.starterCode ?? {};
+    const languages = new Set<string>();
+    DEFAULT_LANGUAGES.forEach((language) => languages.add(normalizeLanguage(language)));
+    Object.keys(starterCode).forEach((language) => languages.add(normalizeLanguage(language)));
+
+    const documents = {
+      state: 'state',
+      languages: Array.from(languages).reduce<Record<string, string>>((acc, language) => {
+        acc[language] = `lang/${language}`;
+        return acc;
+      }, {}),
+    };
+
+    const questionSnapshot: QuestionSnapshot = {
+      ...question,
+      starterCode: { ...starterCode },
+    };
+
     const snapshot: SessionSnapshot = {
       sessionId,
       matchId: payload.matchId,
       topic: payload.topic,
       difficulty: payload.difficulty,
       status: 'pending',
-      question,
+      question: questionSnapshot,
+      documents,
       participants: payload.participants.map((participant) => ({
         userId: participant.userId,
         displayName: participant.displayName,
@@ -52,6 +77,8 @@ export class SessionManager {
         }),
       ),
     );
+
+    await this.initializeDocuments(snapshot);
 
     return snapshot;
   }
@@ -153,5 +180,50 @@ export class SessionManager {
     const endedAt = new Date().toISOString();
     await this.sessions.markEnded(sessionId, endedAt);
     await this.presence.clearPresence(sessionId);
+  }
+
+  private async initializeDocuments(snapshot: SessionSnapshot): Promise<void> {
+    try {
+      const defaultLanguage =
+        Object.keys(snapshot.documents.languages)[0] ?? DEFAULT_LANGUAGES[0] ?? 'javascript';
+
+      const initDoc = async (name: string): Promise<WSSharedDoc> => {
+        const doc = getYDoc(name, true) as WSSharedDoc;
+        if (doc.whenInitialized) {
+          await doc.whenInitialized.catch(() => {});
+        }
+        return doc;
+      };
+
+      const stateDocName = `session:${snapshot.sessionId}/${snapshot.documents.state}`;
+      const stateDoc = await initDoc(stateDocName);
+      stateDoc.transact(() => {
+        const settings = stateDoc.getMap<string>('settings');
+        if (settings.get('language') !== defaultLanguage) {
+          settings.set('language', defaultLanguage);
+        }
+      });
+
+      const starterCode = snapshot.question.starterCode ?? {};
+      await Promise.all(
+        Object.entries(snapshot.documents.languages).map(async ([language, docKey]) => {
+          const docName = `session:${snapshot.sessionId}/${docKey}`;
+          const doc = await initDoc(docName);
+          doc.transact(() => {
+            const text = doc.getText('monaco');
+            if (text.length > 0) {
+              text.delete(0, text.length);
+            }
+            const seed = starterCode[language] ?? '';
+            if (seed.length > 0) {
+              text.insert(0, seed);
+            }
+            doc.getMap('meta').set('seeded', true);
+          });
+        }),
+      );
+    } catch (error) {
+      logger.warn({ err: error, sessionId: snapshot.sessionId }, 'Failed to initialize collaboration documents');
+    }
   }
 }

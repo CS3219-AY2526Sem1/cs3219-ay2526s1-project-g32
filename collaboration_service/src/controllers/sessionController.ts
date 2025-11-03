@@ -1,11 +1,6 @@
 import type { Request, Response, NextFunction } from 'express';
 
-import {
-  SessionCreateResponseSchema,
-  SessionCreateSchema,
-  SessionIdParamsSchema,
-  SessionTokenRequestSchema,
-} from '../schemas';
+import { SessionCreateResponseSchema, SessionCreateSchema, SessionIdParamsSchema, SessionTokenRequestSchema } from '../schemas';
 import type { SessionManager } from '../services/sessionManager';
 
 type QuestionServiceResponse = {
@@ -37,6 +32,7 @@ export class SessionController {
       const response = SessionCreateResponseSchema.parse({
         sessionId: session.sessionId,
         question: session.question,
+        documents: session.documents,
         expiresAt: session.expiresAt,
       });
 
