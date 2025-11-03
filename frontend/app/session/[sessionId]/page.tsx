@@ -111,13 +111,15 @@ export default function SessionPage({ params }: { params: { sessionId: string } 
     return user.email ?? user.id;
   }, [user]);
 
+  const sessionPath = useMemo(() => `/session/${params.sessionId}`, [params.sessionId]);
   const sessionUrl = useMemo(() => {
     if (typeof window !== 'undefined' && window.location) {
-      return window.location.href;
+      const origin = window.location.origin.replace(/\/$/, '');
+      return `${origin}${sessionPath}`;
     }
     const base = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '') ?? '';
-    return base ? `${base}/session/${params.sessionId}` : `/session/${params.sessionId}`;
-  }, [params.sessionId]);
+    return base ? `${base}${sessionPath}` : sessionPath;
+  }, [sessionPath]);
 
   const questionLanguageSet = useMemo(() => {
     if (!sessionSnapshot) return new Set<string>();
