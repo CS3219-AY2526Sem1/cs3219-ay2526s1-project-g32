@@ -9,6 +9,7 @@ import { WebsocketProvider } from 'y-websocket';
 import * as Y from 'yjs';
 import type { editor as MonacoEditorNS } from 'monaco-editor';
 import ReactMarkdown from 'react-markdown';
+import type { Components } from 'react-markdown';
 import {
   Avatar,
   Badge,
@@ -68,6 +69,16 @@ const difficultyColor: Record<'easy' | 'medium' | 'hard', string> = {
 };
 
 const wsBaseUrl = (process.env.NEXT_PUBLIC_COLLAB_WS_URL ?? 'ws://localhost:4010/collab').replace(/\/$/, '');
+
+const markdownComponents: Components = {
+  img: ({ alt, src }) => (
+    <img
+      alt={alt ?? ''}
+      src={src ?? ''}
+      style={{ maxWidth: '100%', height: 'auto', display: 'block', margin: '0 auto' }}
+    />
+  ),
+};
 
 export default function SessionPage({ params }: { params: { sessionId: string } }) {
   const { user, session: authSession, isAuthenticated, isReady: authReady } = useAuth();
@@ -607,7 +618,9 @@ export default function SessionPage({ params }: { params: { sessionId: string } 
             ))}
           </Space>
         ) : null}
-        <ReactMarkdown className="markdown-body">{question.prompt}</ReactMarkdown>
+        <ReactMarkdown className="markdown-body" components={markdownComponents}>
+          {question.prompt}
+        </ReactMarkdown>
       </Space>
     );
   }, [sessionSnapshot]);
