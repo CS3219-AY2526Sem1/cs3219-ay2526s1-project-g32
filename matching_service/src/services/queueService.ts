@@ -11,6 +11,7 @@ export interface QueueEntry {
   userId: string;
   difficulty: string;
   timestamp: number; // Storing as a number (Unix timestamp) is efficient.
+  displayName?: string;
 }
 
 // Helper function to generate the Redis key for a specific topic queue.
@@ -50,7 +51,10 @@ class QueueService {
         // LREM command removes the first occurrence of a value from a list.
         await redisClient.lRem(queueKey, 1, entryString);
         console.log(`Match found for difficulty '${difficulty}' in topic '${topic}'. Matched with user ${entry.userId}.`);
-        return entry;
+        return {
+          ...entry,
+          displayName: typeof entry.displayName === 'string' ? entry.displayName : undefined,
+        };
       }
     }
 

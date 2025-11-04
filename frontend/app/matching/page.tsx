@@ -39,6 +39,11 @@ export default function MatchingPage() {
   const [pollInterval, setPollInterval] = useState<NodeJS.Timeout | null>(null);
   const router = useRouter();
 
+  const displayName =
+    typeof user?.userMetadata?.username === 'string' && user.userMetadata.username.trim().length > 0
+      ? (user.userMetadata.username as string)
+      : user?.email ?? user?.id ?? 'Anonymous';
+
   // Poll for match status when matching
   useEffect(() => {
     if (isMatching && user && session) {
@@ -93,7 +98,12 @@ export default function MatchingPage() {
     setIsMatching(true);
     
     try {
-      const response = await startMatchmaking(selectedTopic, selectedDifficulty, session.accessToken);
+      const response = await startMatchmaking(
+        selectedTopic,
+        selectedDifficulty,
+        session.accessToken,
+        displayName,
+      );
       
       if (response.status === 'success') {
         message.success('Match found! Redirecting to collaboration...');

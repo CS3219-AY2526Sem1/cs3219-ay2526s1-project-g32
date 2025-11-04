@@ -145,13 +145,19 @@ export default function SessionPage({ params }: { params: { sessionId: string } 
     sessionTokenRef.current = sessionToken;
   }, [sessionToken]);
 
-  const localDisplayName = useMemo(() => {
+  const resolvedDisplayName = useMemo(() => {
     if (!user) return undefined;
-    if (typeof user.userMetadata?.username === 'string') {
-      return user.userMetadata.username as string;
+    const participantName =
+      sessionSnapshot?.participants.find((participant) => participant.userId === user.id)?.displayName ?? null;
+    if (typeof participantName === 'string' && participantName.trim().length > 0) {
+      return participantName;
     }
-    return user.email ?? user.id;
-  }, [user]);
+    const usernameMetadata =
+      typeof user.userMetadata?.username === 'string' && (user.userMetadata.username as string).trim().length > 0
+        ? (user.userMetadata.username as string)
+        : undefined;
+    return usernameMetadata ?? user.email ?? user.id;
+  }, [sessionSnapshot, user]);
 
   const sessionPath = useMemo(() => `/session/${params.sessionId}`, [params.sessionId]);
   const sessionUrl = useMemo(() => {
@@ -320,11 +326,13 @@ export default function SessionPage({ params }: { params: { sessionId: string } 
       };
 
       const participantRecord = snapshot.participants.find((participant) => participant.userId === user?.id);
-      const resolvedDisplayName =
-        participantRecord?.displayName ?? localDisplayName ?? participantRecord?.userId ?? user?.id ?? 'Anonymous';
+      const participantDisplayName =
+        (participantRecord?.displayName && participantRecord.displayName.trim().length > 0
+          ? participantRecord.displayName
+          : resolvedDisplayName) ?? participantRecord?.userId ?? user?.id ?? 'Anonymous';
 
       provider.awareness.setLocalState({
-        participant: { userId: user?.id ?? 'anonymous', name: resolvedDisplayName },
+        participant: { userId: user?.id ?? 'anonymous', name: participantDisplayName },
         editor: { language: normalized },
       });
 
@@ -377,7 +385,7 @@ export default function SessionPage({ params }: { params: { sessionId: string } 
 
       return entry;
     },
-    [bindEditorToLanguage, localDisplayName, updatePresenceForLanguage, user],
+    [bindEditorToLanguage, resolvedDisplayName, updatePresenceForLanguage, user],
   );
 
   const applyLanguageSwitch = useCallback(
