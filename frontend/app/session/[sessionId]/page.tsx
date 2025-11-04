@@ -8,9 +8,6 @@ import { MonacoBinding } from 'y-monaco';
 import { WebsocketProvider } from 'y-websocket';
 import * as Y from 'yjs';
 import type { editor as MonacoEditorNS } from 'monaco-editor';
-import 'monaco-editor/esm/vs/basic-languages/python/python.contribution';
-import 'monaco-editor/esm/vs/basic-languages/java/java.contribution';
-import 'monaco-editor/esm/vs/basic-languages/cpp/cpp.contribution';
 import ReactMarkdown from 'react-markdown';
 import {
   Avatar,
@@ -99,6 +96,24 @@ export default function SessionPage({ params }: { params: { sessionId: string } 
   const pendingLanguageRef = useRef<string | null>(null);
   const basePresenceRef = useRef<Record<string, { name: string; connected: boolean }>>({});
   const pendingBindLanguageRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const loadMonacoContributions = async () => {
+      await Promise.all([
+        import('monaco-editor/esm/vs/basic-languages/python/python.contribution'),
+        import('monaco-editor/esm/vs/basic-languages/java/java.contribution'),
+        import('monaco-editor/esm/vs/basic-languages/cpp/cpp.contribution'),
+      ]);
+    };
+
+    loadMonacoContributions().catch((error) => {
+      console.error('Failed to load Monaco language contributions', error);
+    });
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -602,7 +617,7 @@ export default function SessionPage({ params }: { params: { sessionId: string } 
     if (!snapshot) return null;
 
     return (
-      <Space size="large">
+      <Space size="middle" wrap>
         {snapshot.participants.map((participant) => {
           const presence = presenceMap[participant.userId];
           const connected = Boolean(presence?.connected);
@@ -699,7 +714,15 @@ export default function SessionPage({ params }: { params: { sessionId: string } 
               flexWrap: 'wrap',
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 16,
+                flexWrap: 'wrap',
+                minWidth: 0,
+              }}
+            >
               <svg
                 width="24"
                 height="24"
@@ -730,12 +753,33 @@ export default function SessionPage({ params }: { params: { sessionId: string } 
                   strokeLinejoin="round"
                 />
               </svg>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <Title level={4} style={{ margin: 0, color: '#fff' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 0, flex: 1 }}>
+                <Title level={4} style={{ margin: 0, color: '#fff', lineHeight: 1.2 }}>
                   PeerPrep Collaboration Session
                 </Title>
-                <Space size="small" align="center" wrap>
-                  <Text style={{ color: 'var(--muted)' }}>{sessionTitle}</Text>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 12,
+                    flexWrap: 'wrap',
+                    color: 'var(--muted)',
+                    minWidth: 0,
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: 'var(--muted)',
+                      margin: 0,
+                      minWidth: 0,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      flex: 1,
+                    }}
+                  >
+                    {sessionTitle}
+                  </Text>
                   <Tag
                     icon={<LinkOutlined />}
                     color={
@@ -748,16 +792,17 @@ export default function SessionPage({ params }: { params: { sessionId: string } 
                   >
                     {connectionStatus.toUpperCase()}
                   </Tag>
-                </Space>
+                </div>
               </div>
             </div>
             <div
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: 24,
-                flexWrap: 'wrap',
                 justifyContent: 'flex-end',
+                flexWrap: 'wrap',
+                gap: 16,
+                rowGap: 12,
               }}
             >
               {participantBanner}
