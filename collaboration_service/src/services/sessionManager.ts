@@ -24,6 +24,8 @@ export class SessionManager {
     private readonly options: SessionManagerOptions,
   ) {}
 
+  private readonly expiryTimers = new Map<string, NodeJS.Timeout>();
+
   async createSession(payload: SessionCreatePayload, question: QuestionSnapshot): Promise<SessionSnapshot> {
     const sessionId = uuidv4();
     const now = new Date();
@@ -78,6 +80,7 @@ export class SessionManager {
       ),
     );
 
+    this.clearExpiryTimer(sessionId);
     await this.initializeDocuments(snapshot);
 
     return snapshot;
@@ -160,9 +163,11 @@ export class SessionManager {
     if (allDisconnected) {
       const deadline = new Date(timestampMs + this.options.gracePeriodMs);
       expiresAtIso = deadline.toISOString();
+      this.scheduleExpiry(sessionId, expiresAtIso);
     } else if (anyConnected) {
       const extended = new Date(timestampMs + this.options.gracePeriodMs);
       expiresAtIso = extended.toISOString();
+      this.clearExpiryTimer(sessionId);
     }
 
     const updated: SessionSnapshot = SessionSnapshotSchema.parse({
@@ -178,6 +183,7 @@ export class SessionManager {
 
   async endSession(sessionId: string, _reason?: string): Promise<void> {
     const endedAt = new Date().toISOString();
+    this.clearExpiryTimer(sessionId);
     await this.sessions.markEnded(sessionId, endedAt);
     await this.presence.clearPresence(sessionId);
   }
@@ -225,5 +231,55 @@ export class SessionManager {
     } catch (error) {
       logger.warn({ err: error, sessionId: snapshot.sessionId }, 'Failed to initialize collaboration documents');
     }
+  }
+
+  private clearExpiryTimer(sessionId: string) {
+    const existing = this.expiryTimers.get(sessionId);
+    if (existing) {
+      clearTimeout(existing);
+      this.expiryTimers.delete(sessionId);
+    }
+  }
+
+  private scheduleExpiry(sessionId: string, deadlineIso: string) {
+    const deadlineMs = new Date(deadlineIso).getTime();
+    const delay = Math.max(deadlineMs - Date.now(), 0);
+
+    this.clearExpiryTimer(sessionId);
+    const timer = setTimeout(() => {
+      this.handleExpiry(sessionId).catch((error) => {
+        logger.warn({ err: error, sessionId }, 'Failed to handle session expiry');
+      });
+    }, delay);
+
+    this.expiryTimers.set(sessionId, timer);
+  }
+
+  private async handleExpiry(sessionId: string): Promise<void> {
+    this.expiryTimers.delete(sessionId);
+
+    const session = await this.sessions.getById(sessionId);
+    if (!session) {
+      return;
+    }
+
+    if (session.status === 'ended') {
+      return;
+    }
+
+    const deadlineMs = new Date(session.expiresAt).getTime();
+    if (Date.now() < deadlineMs) {
+      // Session expiry was extended after the timer was set; reschedule.
+      this.scheduleExpiry(sessionId, session.expiresAt);
+      return;
+    }
+
+    const allDisconnected = session.participants.every((participant) => !participant.connected);
+    if (!allDisconnected) {
+      return;
+    }
+
+    logger.info({ sessionId }, 'Grace period elapsed; terminating session');
+    await this.endSession(sessionId, 'grace_period_elapsed');
   }
 }

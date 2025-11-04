@@ -661,8 +661,8 @@ export default function SessionPage({ params }: { params: { sessionId: string } 
               title="Unable to load collaboration session"
               subTitle={error}
               extra={
-                <Button type="primary" onClick={() => router.refresh()}>
-                  Retry
+                <Button type="primary" onClick={() => router.push('/dashboard')}>
+                  Back to Dashboard
                 </Button>
               }
             />
