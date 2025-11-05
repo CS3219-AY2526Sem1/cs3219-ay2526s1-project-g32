@@ -8,7 +8,6 @@ Service responsible for managing coding questions, including CRUD operations, fi
 - **Multi-language starter code** – Support for Python, C, C++, Java, and JavaScript starter code templates.
 - **Advanced filtering** – Query questions by title, difficulty level, and topics with optimized database indexes.
 - **Random question selection** – `GET /api/v1/questions/random` returns a random question based on optional difficulty and topic filters, used by matching service.
-- **LeetCode import script** – Automated import of 1000+ LeetCode-style questions from external API with detailed descriptions, topics, and difficulty levels.
 - **Supabase integration** – PostgreSQL database (questionsv3 table) hosted on Supabase with full TypeScript type safety.
 - **CORS support** – Configured for cross-origin requests from frontend and other microservices.
 - **Pino logging** – Structured JSON logging with configurable log levels for debugging and monitoring.
@@ -19,8 +18,6 @@ Service responsible for managing coding questions, including CRUD operations, fi
 question_service/
   index.ts                   # Service entrypoint (Express + Supabase connection)
   supabase-schema.sql        # Database schema with indexes and triggers
-  scripts/
-    import-leetcode-questions.ts  # LeetCode import automation
   src/
     controllers/
       questionController.ts  # REST API handlers
