@@ -125,6 +125,8 @@ export type MatchResponse = {
 export type MatchStatusResponse = {
   status: 'pending' | 'success' | 'not_found';
   sessionId?: string;
+  // prompt indicates backend is asking user whether to expand search to other difficulties
+  prompt?: boolean;
 };
 
 export type CancelMatchRequest = {
@@ -160,6 +162,18 @@ export const cancelMatch = async (topic: string, accessToken: string) =>
   handleResponse<{ message: string }>(
     await fetch(withMatchingUrl('/requests'), {
       method: 'DELETE',
+      headers: {
+        ...jsonHeaders,
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({ topic }),
+    }),
+  );
+
+export const acceptExpand = async (topic: string, accessToken: string) =>
+  handleResponse<{ message: string }>(
+    await fetch(withMatchingUrl('/requests/expand'), {
+      method: 'POST',
       headers: {
         ...jsonHeaders,
         Authorization: `Bearer ${accessToken}`,

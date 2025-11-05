@@ -30,6 +30,52 @@ class QueueService {
   }
 
   /**
+   * Removes all occurrences of a user from all topic queues.
+   * Returns the total number of list entries removed across all queues.
+   * This is used after a successful match to ensure the matched user does not
+   * remain in other difficulty queues.
+   */
+  public async removeUserFromAllQueues(userId: string): Promise<number> {
+    let cursor = 0;
+    let removedCount = 0;
+
+    do {
+      const scanResult = await redisClient.scan(cursor, {
+        MATCH: 'match_queue:*',
+        COUNT: 100,
+      });
+
+      cursor = scanResult.cursor;
+      const keys = scanResult.keys;
+
+      for (const key of keys) {
+        try {
+          const entries = await redisClient.lRange(key, 0, -1);
+          for (const eStr of entries) {
+            try {
+              const e = JSON.parse(eStr);
+              if (e && e.userId === userId) {
+                const rc = await redisClient.lRem(key, 0, eStr);
+                if (rc > 0) {
+                  removedCount += rc;
+                  console.log(`[QueueService] Removed ${rc} entries for user ${userId} from queue "${key}".`);
+                }
+              }
+            } catch (parseErr) {
+              // ignore malformed entries
+            }
+          }
+        } catch (err) {
+          console.error(`[QueueService] Error scanning/removing entries from ${key}:`, err);
+        }
+      }
+    } while (cursor !== 0);
+
+    console.log(`[QueueService] Removed a total of ${removedCount} entries for user ${userId} across all queues.`);
+    return removedCount;
+  }
+
+  /**
    * Searches a topic queue for a user with a matching difficulty.
    * If a match is found, it atomically removes the matched user from the queue.
    * @param difficulty - The difficulty to match.

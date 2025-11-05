@@ -2,29 +2,56 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Button, Card, Col, ConfigProvider, Layout, Row, Select, Space, Typography, message } from 'antd';
+import { Button, Card, Col, ConfigProvider, Layout, Row, Select, Space, Typography, message, Modal } from 'antd';
 import { PlayCircleOutlined, UserOutlined, ClockCircleOutlined } from '@ant-design/icons';
 import { useAuth } from '../../hooks/useAuth';
 import { useRequireAuth } from '../../hooks/useRequireAuth';
-import { startMatchmaking, getMatchStatus, cancelMatch } from '../../lib/api-client';
+import { startMatchmaking, getMatchStatus, cancelMatch, acceptExpand } from '../../lib/api-client';
 import { peerPrepTheme } from '../../lib/theme';
 
 const { Header, Content } = Layout;
 const { Title, Text, Paragraph } = Typography;
 const { Option } = Select;
 
-// Define the available topics and difficulties
+// Define the available topics and difficulties (kept in sync with Question Service)
 const TOPICS = [
   'Array',
-  'String', 
-  'Linked List',
-  'Tree',
-  'Graphs',
+  'Backtracking',
+  'Binary Search',
+  'Binary Tree',
+  'Bit Manipulation',
+  'Bitmask',
+  'Breadth-First Search',
+  'Counting',
+  'Concurrency',
+  'Design',
+  'Divide and Conquer',
   'Dynamic Programming',
-  'Sorting',
-  'Searching',
+  'Enumeration',
+  'Game Theory',
+  'Geometry',
+  'Greedy',
+  'Graph',
   'Hash Table',
-  'Stacks and Queues'
+  'Heap (Priority Queue)',
+  'Linked List',
+  'Matrix',
+  'Math',
+  'Monotonic Stack',
+  'Ordered Set',
+  'Prefix Sum',
+  'Recursion',
+  'Segment Tree',
+  'Shell',
+  'Simulation',
+  'Sliding Window',
+  'Sorting',
+  'Stack',
+  'String',
+  'Topological Sort',
+  'Tree',
+  'Two Pointers',
+  'Union Find'
 ];
 
 const DIFFICULTIES = ['Easy', 'Medium', 'Hard'];
@@ -37,6 +64,7 @@ export default function MatchingPage() {
   const [selectedDifficulty, setSelectedDifficulty] = useState<string>('');
   const [isMatching, setIsMatching] = useState(false);
   const [pollInterval, setPollInterval] = useState<NodeJS.Timeout | null>(null);
+  const [showExpandModal, setShowExpandModal] = useState(false);
   const router = useRouter();
 
   // Poll for match status when matching
@@ -55,6 +83,11 @@ export default function MatchingPage() {
           } else if (status.status === 'not_found') {
             message.info('No active match request found');
             setIsMatching(false);
+          }
+
+          // If backend sets prompt flag, show expand modal
+          if (status.prompt) {
+            setShowExpandModal(true);
           }
         } catch (error) {
           console.error('Error polling match status:', error);
@@ -129,6 +162,19 @@ export default function MatchingPage() {
       console.error('Error cancelling match:', error);
       setIsMatching(false);
       message.info('Matchmaking cancelled');
+    }
+  };
+
+  const handleAcceptExpand = async () => {
+    try {
+      if (session) {
+        await acceptExpand(selectedTopic, session.accessToken);
+        message.success('Search expanded to all difficulties.');
+        setShowExpandModal(false);
+      }
+    } catch (err: any) {
+      console.error('Error accepting expand:', err);
+      message.error('Failed to expand search');
     }
   };
 
@@ -343,6 +389,16 @@ export default function MatchingPage() {
             </Row>
           </div>
         </Content>
+        <Modal
+          title="Expand search to more difficulties?"
+          open={showExpandModal}
+          onOk={handleAcceptExpand}
+          onCancel={() => setShowExpandModal(false)}
+          okText="Yes, expand"
+          cancelText="No"
+        >
+          <p>You've been waiting for a while. Would you like to expand your search to Easy, Medium and Hard for this topic?</p>
+        </Modal>
       </Layout>
     </ConfigProvider>
   );
