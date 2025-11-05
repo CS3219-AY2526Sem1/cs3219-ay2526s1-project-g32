@@ -41,6 +41,7 @@ export type PublicUser = {
   emailConfirmed: boolean;
   createdAt: string;
   userMetadata: Record<string, unknown>;
+  isAdmin: boolean;
 };
 
 export type LoginResponse = {

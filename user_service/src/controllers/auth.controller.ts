@@ -82,7 +82,9 @@ export const validateTokenHandler = async (
     const { accessToken, userId } = req.body as { accessToken: string; userId: string };
 
     try {
-      const decoded = jwt.verify(accessToken, config.supabase.jwtSecret) as JwtPayload;
+      const decoded = jwt.verify(accessToken, config.supabase.jwtSecret) as JwtPayload & {
+        user_metadata?: Record<string, unknown>;
+      };
       const tokenUserId = typeof decoded.sub === 'string' ? decoded.sub : null;
 
       if (!tokenUserId) {
@@ -95,7 +97,9 @@ export const validateTokenHandler = async (
         return;
       }
 
-      res.status(200).json({ isValid: true, userId: tokenUserId });
+      const isAdmin = Boolean(decoded.user_metadata?.isAdmin);
+
+      res.status(200).json({ isValid: true, userId: tokenUserId, isAdmin });
     } catch (error) {
       if (error instanceof TokenExpiredError) {
         res.status(200).json({ isValid: false, reason: 'token_expired' });
