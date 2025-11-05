@@ -90,13 +90,20 @@ class TimeoutService {
    * This should be called when a user is added to the waiting queue.
    * @param entry - The queue entry for the user.
    */
-  public scheduleTimeoutCheck(entry: QueueEntry, options?: { withPrompt?: boolean }): void {
+  public scheduleTimeoutCheck(entryOrUser: QueueEntry | string, options?: { withPrompt?: boolean }): void {
     if (!channel) {
       console.error('[TimeoutService] RabbitMQ channel is not available. Cannot schedule timeout.');
       return;
     }
     const TEMP_QUEUE_NAME = 'match_timeouts_temp_queue';
     const withPrompt = options?.withPrompt !== false; // default true
+
+    // Normalize the entry. Callers may provide a QueueEntry or just a userId
+    // (for final-only scheduling). When only a userId is provided we create a
+    // minimal entry with a neutral difficulty for the message payload.
+    const entry: QueueEntry = typeof entryOrUser === 'string'
+      ? { userId: entryOrUser, difficulty: 'Medium', timestamp: Date.now() }
+      : entryOrUser;
 
     // Create a unique timeout id for this scheduled lifecycle
     const timeoutId = `${entry.userId}:${Date.now()}:${Math.random().toString(36).substring(2, 9)}`;

@@ -275,8 +275,13 @@ export const acceptExpand = async (req: AuthenticatedRequest, res: Response) => 
 
     // Restart final timeout (don't schedule another prompt). One final timeout is sufficient
     // because final handler removes by userId across all queues.
-    const restartEntry: QueueEntry = { userId, difficulty: 'Any', timestamp: Date.now() };
-    timeoutService.scheduleTimeoutCheck(restartEntry, { withPrompt: false });
+  // We only need an entry shell to schedule the final-only timeout. Use a
+  // neutral difficulty (Medium) as a valid placeholder so it follows the
+  // same naming convention as other queue entries.
+  // Schedule a final-only timeout for this user. The API now accepts a
+  // userId directly for final-only scheduling so no placeholder QueueEntry
+  // is necessary.
+  timeoutService.scheduleTimeoutCheck(userId, { withPrompt: false });
 
     // Clear any prompt flag so frontend stops showing the popup
     await redisClient.del(`match_prompt:${userId}`);
