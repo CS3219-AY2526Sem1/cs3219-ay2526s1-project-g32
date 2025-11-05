@@ -6,6 +6,7 @@ import {
   loginUser,
   registerUser,
   sendMagicLink,
+  updateUserAdminStatus,
 } from '../services/auth.service';
 import type { AuthenticatedRequest } from '../middleware/authenticate';
 import { HttpError } from '../utils/httpError';
@@ -113,6 +114,24 @@ export const validateTokenHandler = async (
 
       throw error;
     }
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const setAdminStatusHandler = async (
+  req: Request<{ userId: string }, unknown, { isAdmin?: boolean }>,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const { userId } = req.params;
+    const { isAdmin } = req.body || {};
+
+    const targetStatus = typeof isAdmin === 'boolean' ? isAdmin : true;
+    const user = await updateUserAdminStatus(userId, targetStatus);
+
+    res.status(200).json({ user });
   } catch (error) {
     next(error);
   }
