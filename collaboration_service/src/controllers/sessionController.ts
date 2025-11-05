@@ -38,7 +38,10 @@ export class SessionController {
 
   private async fetchQuestion(topic: string, difficulty: string) {
     const url = new URL('questions/random', this.questionServiceBaseUrl);
-    difficulty = difficulty.charAt(0).toUpperCase() + difficulty.slice(1);
+    // The question service stores difficulty in lowercase (e.g. 'easy', 'medium', 'hard').
+    // Ensure we send a lowercase difficulty to avoid case-sensitive mismatches that
+    // would result in 404 (no questions found).
+    difficulty = difficulty.toLowerCase();
     url.searchParams.set('topic', topic);
     url.searchParams.set('difficulty', difficulty);
 
