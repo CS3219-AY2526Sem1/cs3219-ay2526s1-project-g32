@@ -69,8 +69,6 @@ export type SessionSnapshot = z.infer<typeof SessionSnapshotSchema>;
 
 export const SessionCreateResponseSchema = z.object({
   sessionId: z.string().uuid(),
-  question: QuestionSnapshotSchema,
-  documents: SessionDocumentsSchema,
   expiresAt: z.string().datetime(),
 });
 export type SessionCreateResponse = z.infer<typeof SessionCreateResponseSchema>;

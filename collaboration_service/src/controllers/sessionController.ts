@@ -29,14 +29,12 @@ export class SessionController {
       const question = await this.fetchQuestion(payload.topic, payload.difficulty);
       const session = await this.sessionManager.createSession(payload, question);
 
-      const response = SessionCreateResponseSchema.parse({
-        sessionId: session.sessionId,
-        question: session.question,
-        documents: session.documents,
-        expiresAt: session.expiresAt,
-      });
-
-      res.status(201).json(response);
+      res.status(201).json(
+        SessionCreateResponseSchema.parse({
+          sessionId: session.sessionId,
+          expiresAt: session.expiresAt,
+        }),
+      );
     } catch (error) {
       next(error);
     }
