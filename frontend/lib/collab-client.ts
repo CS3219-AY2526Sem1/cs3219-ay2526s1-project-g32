@@ -15,6 +15,11 @@ export type QuestionSnapshot = {
   };
 };
 
+export type SessionDocuments = {
+  state: string;
+  languages: Record<string, string>;
+};
+
 export type SessionSnapshot = {
   sessionId: string;
   matchId: string;
@@ -22,6 +27,7 @@ export type SessionSnapshot = {
   difficulty: 'easy' | 'medium' | 'hard';
   status: 'pending' | 'active' | 'ended';
   question: QuestionSnapshot;
+  documents: SessionDocuments;
   participants: SessionParticipant[];
   createdAt?: string;
   updatedAt?: string;

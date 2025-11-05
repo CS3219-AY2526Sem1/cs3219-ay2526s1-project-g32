@@ -36,6 +36,10 @@ export const createMatchRequestSchema = {
   body: z.object({
     difficulty: difficultyEnum,
     topic: topicEnum,
+    displayName: z
+      .string()
+      .min(1, 'Display name is required')
+      .max(100, 'Display name must be at most 100 characters'),
   }),
 };
 
@@ -69,6 +73,7 @@ export const handleRequeueSchema = {
     userId: userIdField,
     difficulty: difficultyEnum,
     topic: topicEnum,
+    displayName: z.string().max(100).optional(),
   }),
 };
 

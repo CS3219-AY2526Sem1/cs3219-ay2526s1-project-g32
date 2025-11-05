@@ -13,7 +13,14 @@ const COLLABORATION_SERVICE_URL = process.env.COLLABORATION_SERVICE_URL || 'http
  * Creates a collaboration session by calling the collaboration service.
  * Formats the request according to the collaboration service's SessionCreateSchema.
  */
-async function createCollaborationSession(user1Id: string, user2Id: string, difficulty: string, topic: string) {
+async function createCollaborationSession(
+  user1Id: string,
+  user1DisplayName: string,
+  user2Id: string,
+  user2DisplayName: string | undefined,
+  difficulty: string,
+  topic: string,
+) {
   try {
     // Generate a unique match ID for this session
     const matchId = `match-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
@@ -27,9 +34,9 @@ async function createCollaborationSession(user1Id: string, user2Id: string, diff
       topic,
       difficulty: normalizedDifficulty,
       participants: [
-        { userId: user1Id },
-        { userId: user2Id }
-      ]
+        { userId: user1Id, displayName: user1DisplayName },
+        { userId: user2Id, displayName: user2DisplayName },
+      ],
     };
 
     console.log(`[Controller] Creating collaboration session for match ${matchId} with payload:`, sessionPayload);
@@ -70,8 +77,12 @@ async function createCollaborationSession(user1Id: string, user2Id: string, diff
 export const createMatchRequest = async (req: AuthenticatedRequest, res: Response) => {
   try {
     // Data is already validated by middleware, and user is authenticated
-    const { difficulty, topic }: Omit<CreateMatchRequest, 'userId'> = req.body;
+    const { difficulty, topic, displayName }: Omit<CreateMatchRequest, 'userId'> = req.body;
     const userId = req.user!.id; // User ID comes from authentication middleware
+    const resolvedDisplayName =
+      (typeof displayName === 'string' && displayName.trim().length > 0
+        ? displayName
+        : req.user?.displayName?.trim()) || userId;
 
     console.log(`[Controller] Received match request from ${userId} for topic "${topic}" with difficulty "${difficulty}".`);
     await redisClient.set(`match_status:${userId}`, 'pending');
@@ -82,7 +93,14 @@ export const createMatchRequest = async (req: AuthenticatedRequest, res: Respons
       console.log(`[Controller] Match found for ${userId}! Matched with ${matchedUser.userId}.`);
       
       // Create collaboration session
-      const session = await createCollaborationSession(userId, matchedUser.userId, difficulty, topic);
+      const session = await createCollaborationSession(
+        userId,
+        resolvedDisplayName,
+        matchedUser.userId,
+        matchedUser.displayName,
+        difficulty,
+        topic,
+      );
 
       // Persist the sessionId for both users so polling clients can retrieve it.
       // Set a TTL to avoid stale keys lingering in Redis.
@@ -101,7 +119,12 @@ export const createMatchRequest = async (req: AuthenticatedRequest, res: Respons
       return res.status(200).json({ status: 'success', message: 'Match found!', sessionId: session.sessionId, matchedWith: matchedUser.userId });
     } else {
       console.log(`[Controller] No match found for ${userId}. Adding to queue.`);
-      const newEntry: QueueEntry = { userId, difficulty, timestamp: Date.now() };
+      const newEntry: QueueEntry = {
+        userId,
+        difficulty,
+        timestamp: Date.now(),
+        displayName: resolvedDisplayName,
+      };
       await queueService.addToQueue(newEntry, topic);
       timeoutService.scheduleTimeoutCheck(newEntry);
       return res.status(202).json({
@@ -179,10 +202,15 @@ export const getMatchStatus = async (req: AuthenticatedRequest, res: Response) =
 export const handleRequeue = async (req: Request, res: Response) => {
     try {
         // Get required fields from request body
-        const { userId, difficulty, topic } = req.body;
+        const { userId, difficulty, topic, displayName } = req.body;
         
         console.log(`[Controller] Re-queuing user ${userId}.`);
-        const entry: QueueEntry = { userId, difficulty, timestamp: Date.now() };
+        const entry: QueueEntry = {
+          userId,
+          difficulty,
+          timestamp: Date.now(),
+          displayName: typeof displayName === 'string' ? displayName : undefined,
+        };
         await queueService.addToFrontOfQueue(entry, topic);
 
         // Schedule a new timeout check for the re-queued user.

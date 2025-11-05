@@ -6,6 +6,7 @@ const USER_SERVICE_URL = process.env.USER_SERVICE_URL || 'http://localhost:4001'
 interface AuthenticatedRequest extends Request {
   user?: {
     id: string;
+    displayName?: string;
   };
 }
 
@@ -53,8 +54,20 @@ export const authenticate = async (req: AuthenticatedRequest, res: Response, nex
       }
 
       // Token is valid, attach user info to request
+      const tokenMetadata = payload?.user_metadata;
+      const usernameFromToken =
+        tokenMetadata && typeof tokenMetadata === 'object' && tokenMetadata !== null
+          ? (tokenMetadata as Record<string, unknown>).username
+          : undefined;
+
+      const displayName =
+        typeof usernameFromToken === 'string' && usernameFromToken.trim().length > 0
+          ? usernameFromToken
+          : undefined;
+
       req.user = {
-        id: validatedUserId || userId
+        id: validatedUserId || userId,
+        displayName,
       };
 
       next();

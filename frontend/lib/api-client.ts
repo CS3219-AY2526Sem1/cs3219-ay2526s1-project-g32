@@ -113,6 +113,7 @@ export const fetchMe = async (accessToken: string) =>
 export type CreateMatchRequest = {
   difficulty: 'Easy' | 'Medium' | 'Hard';
   topic: string;
+  displayName: string;
 };
 
 export type MatchResponse = {
@@ -134,7 +135,12 @@ export type CancelMatchRequest = {
 // Matching Service API Functions
 const withMatchingUrl = (path: string) => `${MATCHING_SERVICE_URL}${path}`;
 
-export const startMatchmaking = async (topic: string, difficulty: string, accessToken: string) =>
+export const startMatchmaking = async (
+  topic: string,
+  difficulty: string,
+  accessToken: string,
+  displayName: string,
+) =>
   handleResponse<MatchResponse>(
     await fetch(withMatchingUrl('/requests'), {
       method: 'POST',
@@ -142,7 +148,7 @@ export const startMatchmaking = async (topic: string, difficulty: string, access
         ...jsonHeaders,
         Authorization: `Bearer ${accessToken}`,
       },
-      body: JSON.stringify({ topic, difficulty }),
+      body: JSON.stringify({ topic, difficulty, displayName }),
     }),
   );
 

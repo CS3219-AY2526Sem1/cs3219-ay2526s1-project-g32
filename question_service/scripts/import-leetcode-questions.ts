@@ -73,16 +73,13 @@ function mapToSupabaseFormat(problem: LeetCodeProblem, details?: ProblemDetails 
   const description = details?.question 
     ? cleanHtmlContent(details.question)
     : generateFallbackDescription(problem);
-  
-  // Generate LeetCode problem URL as image_url (for problem reference/screenshots)
-  const problemUrl = `https://leetcode.com/problems/${problem.titleSlug}/`;
-  
+
   return {
     title: problem.title,
+    slug: problem.titleSlug,
     description,
     difficulty: problem.difficulty,
     topics: problem.topicTags?.map(tag => tag.name) || ['General'],
-    image_url: problemUrl // Use problem URL instead of undefined
   };
 }
 
