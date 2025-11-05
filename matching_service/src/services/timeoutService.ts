@@ -33,49 +33,52 @@ export async function connectRabbitMQ() {
       console.error('[RabbitMQ] Channel error:', err);
     });
 
-    // Create a temporary queue with TTL that forwards to the timeout queue
-    const TEMP_QUEUE_NAME = 'match_timeouts_temp_queue';
-
     // Assert the main timeout queue that will receive expired messages
     await channel.assertQueue(TIMEOUT_QUEUE_NAME, { durable: true });
 
-    // Try to assert the temp queue. If a precondition failed because the queue
-    // already exists with different arguments (common after code changes), try
-    // to delete the existing queue and re-declare it with the desired args.
-    try {
-      await channel.assertQueue(TEMP_QUEUE_NAME, {
-        durable: true,
-        arguments: {
-          'x-dead-letter-exchange': '', // Use default exchange
-          'x-dead-letter-routing-key': TIMEOUT_QUEUE_NAME, // Route to timeout queue
-        },
-      });
-    } catch (err: any) {
-      // PRECONDITION_FAILED is code 406 in amqplib
-      if (err && (err.code === 406 || err.replyCode === 406)) {
-        console.warn('[RabbitMQ] Queue assert precondition failed for', TEMP_QUEUE_NAME, '- attempting to delete and recreate the queue.');
-        try {
-          // Best-effort delete existing queue, ignore not-found errors
-          await channel.deleteQueue(TEMP_QUEUE_NAME);
-          console.log('[RabbitMQ] Deleted existing queue', TEMP_QUEUE_NAME);
+    // We'll use two separate temporary queues for delayed messages:
+    //  - one for prompt messages (short TTL)
+    //  - one for final messages (long TTL)
+    // This prevents shorter TTL messages from being blocked by longer TTL
+    // messages that were enqueued earlier in the same queue.
+    const TEMP_PROMPT_QUEUE = 'match_timeouts_temp_prompt_queue';
+    const TEMP_FINAL_QUEUE = 'match_timeouts_temp_final_queue';
 
-          // Re-declare with desired args
-          await channel.assertQueue(TEMP_QUEUE_NAME, {
-            durable: true,
-            arguments: {
-              'x-dead-letter-exchange': '',
-              'x-dead-letter-routing-key': TIMEOUT_QUEUE_NAME,
-            },
-          });
-          console.log('[RabbitMQ] Re-created queue', TEMP_QUEUE_NAME);
-        } catch (deleteErr) {
-          console.error('[RabbitMQ] Failed to delete/recreate queue', TEMP_QUEUE_NAME, deleteErr);
-          throw deleteErr;
+    const assertTempQueue = async (qName: string) => {
+      try {
+        await channel!.assertQueue(qName, {
+          durable: true,
+          arguments: {
+            'x-dead-letter-exchange': '',
+            'x-dead-letter-routing-key': TIMEOUT_QUEUE_NAME,
+          },
+        });
+      } catch (err: any) {
+        if (err && (err.code === 406 || err.replyCode === 406)) {
+          console.warn('[RabbitMQ] Queue assert precondition failed for', qName, '- attempting to delete and recreate the queue.');
+          try {
+            await channel!.deleteQueue(qName);
+            console.log('[RabbitMQ] Deleted existing queue', qName);
+            await channel!.assertQueue(qName, {
+              durable: true,
+              arguments: {
+                'x-dead-letter-exchange': '',
+                'x-dead-letter-routing-key': TIMEOUT_QUEUE_NAME,
+              },
+            });
+            console.log('[RabbitMQ] Re-created queue', qName);
+          } catch (deleteErr) {
+            console.error('[RabbitMQ] Failed to delete/recreate queue', qName, deleteErr);
+            throw deleteErr;
+          }
+        } else {
+          throw err;
         }
-      } else {
-        throw err;
       }
-    }
+    };
+
+    await assertTempQueue(TEMP_PROMPT_QUEUE);
+    await assertTempQueue(TEMP_FINAL_QUEUE);
 
     console.log('[RabbitMQ] Connected and timeout queues are ready.');
   } catch (error) {
@@ -95,8 +98,9 @@ class TimeoutService {
       console.error('[TimeoutService] RabbitMQ channel is not available. Cannot schedule timeout.');
       return;
     }
-    const TEMP_QUEUE_NAME = 'match_timeouts_temp_queue';
-    const withPrompt = options?.withPrompt !== false; // default true
+  const TEMP_PROMPT_QUEUE = 'match_timeouts_temp_prompt_queue';
+  const TEMP_FINAL_QUEUE = 'match_timeouts_temp_final_queue';
+  const withPrompt = options?.withPrompt !== false; // default true
 
     // Normalize the entry. Callers may provide a QueueEntry or just a userId
     // (for final-only scheduling). When only a userId is provided we create a
@@ -123,13 +127,14 @@ class TimeoutService {
     // If withPrompt is true, schedule a prompt message at PROMPT_TIMEOUT_MS
     if (withPrompt) {
       const promptMessage = JSON.stringify({ type: 'prompt', userId: entry.userId, timeoutId });
-      channel.sendToQueue(TEMP_QUEUE_NAME, Buffer.from(promptMessage), { expiration: String(PROMPT_TIMEOUT_MS) });
+      // Send to the prompt-specific temp queue so its short TTL isn't blocked.
+      channel.sendToQueue(TEMP_PROMPT_QUEUE, Buffer.from(promptMessage), { expiration: String(PROMPT_TIMEOUT_MS) });
       console.log(`[TimeoutService] Scheduled PROMPT for user ${entry.userId} in ${PROMPT_TIMEOUT_MS}ms (timeoutId=${timeoutId}).`);
     }
 
     // Always schedule the final timeout message at MATCH_TIMEOUT_MS
     const finalMessage = JSON.stringify({ type: 'final', userId: entry.userId, timeoutId });
-    channel.sendToQueue(TEMP_QUEUE_NAME, Buffer.from(finalMessage), { expiration: String(MATCH_TIMEOUT_MS) });
+    channel.sendToQueue(TEMP_FINAL_QUEUE, Buffer.from(finalMessage), { expiration: String(MATCH_TIMEOUT_MS) });
     console.log(`[TimeoutService] Scheduled FINAL timeout for user ${entry.userId} in ${MATCH_TIMEOUT_MS}ms (timeoutId=${timeoutId}).`);
   }
 

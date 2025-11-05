@@ -153,10 +153,43 @@ export const deleteMatchRequest = async (req: AuthenticatedRequest, res: Respons
         const userId = req.user!.id; // User ID comes from authentication middleware
 
         console.log(`[Controller] Received cancellation request from ${userId} for topic "${topic}".`);
-        await queueService.removeFromQueue(userId, topic);
-        await redisClient.del(`match_status:${userId}`);
-        await redisClient.del(`match_session:${userId}`);
-        
+
+        // Remove the user from all queues to ensure there are no lingering
+        // entries in any difficulty/topic. If removeUserFromAllQueues fails
+        // for any reason, fall back to removing from the specific topic.
+        try {
+          await queueService.removeUserFromAllQueues(userId);
+          console.log(`[Controller] Removed user ${userId} from all queues.`);
+        } catch (err) {
+          console.warn('[Controller] removeUserFromAllQueues failed, falling back to removeFromQueue for topic', topic, err);
+          try {
+            await queueService.removeFromQueue(userId, topic);
+          } catch (innerErr) {
+            console.warn('[Controller] removeFromQueue fallback also failed for', userId, innerErr);
+          }
+        }
+
+        // Cancel any pending timeouts for this user and clear prompt/status/session keys.
+        try {
+          const prevTimeoutId = await redisClient.get(`match_timeout_id:${userId}`);
+          if (prevTimeoutId) {
+            await redisClient.set(`match_timeout_cancel:${prevTimeoutId}`, 'true');
+            await redisClient.expire(`match_timeout_cancel:${prevTimeoutId}`, 120);
+          }
+        } catch (err) {
+          console.warn('[Controller] Could not cancel timeout id for', userId, err);
+        }
+
+        // Clean up Redis keys related to the user's pending request.
+        try {
+          await redisClient.del(`match_status:${userId}`);
+          await redisClient.del(`match_session:${userId}`);
+          await redisClient.del(`match_prompt:${userId}`);
+          await redisClient.del(`match_timeout_id:${userId}`);
+        } catch (err) {
+          console.warn('[Controller] Could not clean up Redis keys for', userId, err);
+        }
+
         return res.status(200).json({ message: 'You have been removed from the queue.' });
 
     } catch (error: any) {
