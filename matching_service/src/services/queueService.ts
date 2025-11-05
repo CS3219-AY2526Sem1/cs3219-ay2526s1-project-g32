@@ -24,9 +24,43 @@ class QueueService {
    */
   public async addToQueue(entry: QueueEntry, topic: string): Promise<void> {
     const queueKey = getQueueKey(topic);
-    // rPUSH adds the new entry to the end of the list (right side).
-    await redisClient.rPush(queueKey, JSON.stringify(entry));
-    console.log(`User ${entry.userId} added to queue for topic: ${topic}`);
+    // Atomically remove any existing entries for this user in the queue and
+    // push the new entry. This avoids a race between separate remove + add
+    // operations. We use a small Lua script executed server-side.
+    const lua = `
+      local q = KEYS[1]
+      local userId = ARGV[1]
+      local newEntry = ARGV[2]
+      local pushSide = ARGV[3]
+      local entries = redis.call('LRANGE', q, 0, -1)
+      for i = 1, #entries do
+        local v = entries[i]
+        if string.find(v, '"userId":"' .. userId .. '"', 1, true) then
+          redis.call('LREM', q, 0, v)
+        end
+      end
+      if pushSide == 'r' then
+        redis.call('RPUSH', q, newEntry)
+      else
+        redis.call('LPUSH', q, newEntry)
+      end
+      return 1
+    `;
+
+    try {
+      await redisClient.eval(lua, { keys: [queueKey], arguments: [entry.userId, JSON.stringify(entry), 'r'] });
+      console.log(`User ${entry.userId} added to queue for topic: ${topic}`);
+    } catch (err) {
+      // Fallback to non-atomic operations if EVAL fails for any reason.
+      console.warn('[QueueService] Lua EVAL failed, falling back to remove+push:', err);
+      try {
+        await this.removeFromQueue(entry.userId, topic);
+      } catch (remErr) {
+        console.warn(`[QueueService] Failed to remove existing entry for user ${entry.userId} in topic ${topic}:`, remErr);
+      }
+      await redisClient.rPush(queueKey, JSON.stringify(entry));
+      console.log(`User ${entry.userId} added to queue for topic: ${topic}`);
+    }
   }
 
   /**
@@ -112,9 +146,40 @@ class QueueService {
    */
   public async addToFrontOfQueue(entry: QueueEntry, topic: string): Promise<void> {
     const queueKey = getQueueKey(topic);
-    // LPUSH adds the new entry to the front of the list (left side).
-    await redisClient.lPush(queueKey, JSON.stringify(entry));
-    console.log(`User ${entry.userId} re-queued at the front for topic: ${topic}`);
+    // Atomically remove existing entries for this user and push to the front.
+    const luaFront = `
+      local q = KEYS[1]
+      local userId = ARGV[1]
+      local newEntry = ARGV[2]
+      local pushSide = ARGV[3]
+      local entries = redis.call('LRANGE', q, 0, -1)
+      for i = 1, #entries do
+        local v = entries[i]
+        if string.find(v, '"userId":"' .. userId .. '"', 1, true) then
+          redis.call('LREM', q, 0, v)
+        end
+      end
+      if pushSide == 'r' then
+        redis.call('RPUSH', q, newEntry)
+      else
+        redis.call('LPUSH', q, newEntry)
+      end
+      return 1
+    `;
+
+    try {
+      await redisClient.eval(luaFront, { keys: [queueKey], arguments: [entry.userId, JSON.stringify(entry), 'l'] });
+      console.log(`User ${entry.userId} re-queued at the front for topic: ${topic}`);
+    } catch (err) {
+      console.warn('[QueueService] Lua EVAL failed for lpush fallback, falling back to remove+lpush:', err);
+      try {
+        await this.removeFromQueue(entry.userId, topic);
+      } catch (remErr) {
+        console.warn(`[QueueService] Failed to remove existing entry for user ${entry.userId} in topic ${topic}:`, remErr);
+      }
+      await redisClient.lPush(queueKey, JSON.stringify(entry));
+      console.log(`User ${entry.userId} re-queued at the front for topic: ${topic}`);
+    }
   }
 
   /**
