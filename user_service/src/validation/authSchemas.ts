@@ -41,3 +41,15 @@ export const validateTokenSchema = {
     userId: z.string().min(1, 'userId is required'),
   }),
 };
+
+export const setAdminStatusSchema = {
+  params: z.object({
+    userId: z.string().min(1, 'userId is required'),
+  }),
+  body: z.object({
+    isAdmin: z.boolean({
+      invalid_type_error: 'isAdmin must be a boolean',
+      required_error: 'isAdmin is required',
+    }),
+  }),
+};
