@@ -122,13 +122,15 @@ class TimeoutService {
 
     // If withPrompt is true, schedule a prompt message at PROMPT_TIMEOUT_MS
     if (withPrompt) {
-      const promptMessage = JSON.stringify({ type: 'prompt', userId: entry.userId, entryString: JSON.stringify(entry), timeoutId });
+      // entryString was previously included for debugging but is unused by the consumer.
+      const promptMessage = JSON.stringify({ type: 'prompt', userId: entry.userId, timeoutId });
       channel.sendToQueue(TEMP_QUEUE_NAME, Buffer.from(promptMessage), { expiration: String(PROMPT_TIMEOUT_MS) });
       console.log(`[TimeoutService] Scheduled PROMPT for user ${entry.userId} in ${PROMPT_TIMEOUT_MS}ms (timeoutId=${timeoutId}).`);
     }
 
     // Always schedule the final timeout message at MATCH_TIMEOUT_MS
-    const finalMessage = JSON.stringify({ type: 'final', userId: entry.userId, entryString: JSON.stringify(entry), timeoutId });
+  // entryString removed from payload — consumer doesn't use the serialized entry.
+  const finalMessage = JSON.stringify({ type: 'final', userId: entry.userId, timeoutId });
     channel.sendToQueue(TEMP_QUEUE_NAME, Buffer.from(finalMessage), { expiration: String(MATCH_TIMEOUT_MS) });
     console.log(`[TimeoutService] Scheduled FINAL timeout for user ${entry.userId} in ${MATCH_TIMEOUT_MS}ms (timeoutId=${timeoutId}).`);
   }
@@ -147,7 +149,7 @@ class TimeoutService {
       if (msg) {
         try {
           const payload = JSON.parse(msg.content.toString());
-          const { type, userId, entryString, timeoutId } = payload;
+          const { type, userId, timeoutId } = payload;
           console.log(`[TimeoutService] Received expired message for user ${userId} (type=${type}, timeoutId=${timeoutId}).`);
 
           // Only act if user is still pending
