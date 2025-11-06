@@ -116,6 +116,35 @@ export const createMatchRequest = async (req: AuthenticatedRequest, res: Respons
       await redisClient.set(`match_status:${userId}`, 'success');
       await redisClient.set(`match_status:${matchedUser.userId}`, 'success');
 
+      // Remove any lingering entries for both users across all queues so they cannot be matched again.
+      try {
+        await queueService.removeUserFromAllQueues(userId);
+      } catch (err) {
+        console.warn('[Controller] Failed to remove leftover queue entries for user', userId, err);
+      }
+      try {
+        await queueService.removeUserFromAllQueues(matchedUser.userId);
+      } catch (err) {
+        console.warn('[Controller] Failed to remove leftover queue entries for matched user', matchedUser.userId, err);
+      }
+
+      // Cancel any pending timeouts and clear prompts for both users to avoid stray timeout actions.
+      const cancelCleanupFor = async (uid: string) => {
+        try {
+          const prevTimeoutId = await redisClient.get(`match_timeout_id:${uid}`);
+          if (prevTimeoutId) {
+            await redisClient.set(`match_timeout_cancel:${prevTimeoutId}`, 'true');
+            await redisClient.expire(`match_timeout_cancel:${prevTimeoutId}`, 120);
+          }
+          await redisClient.del(`match_prompt:${uid}`);
+          await redisClient.del(`match_timeout_id:${uid}`);
+        } catch (err) {
+          console.warn('[Controller] Could not cancel timeout/clear prompt for', uid, err);
+        }
+      };
+
+      await cancelCleanupFor(userId);
+      await cancelCleanupFor(matchedUser.userId);
       return res.status(200).json({ status: 'success', message: 'Match found!', sessionId: session.sessionId, matchedWith: matchedUser.userId });
     } else {
       console.log(`[Controller] No match found for ${userId}. Adding to queue.`);
@@ -147,10 +176,43 @@ export const deleteMatchRequest = async (req: AuthenticatedRequest, res: Respons
         const userId = req.user!.id; // User ID comes from authentication middleware
 
         console.log(`[Controller] Received cancellation request from ${userId} for topic "${topic}".`);
-        await queueService.removeFromQueue(userId, topic);
-        await redisClient.del(`match_status:${userId}`);
-        await redisClient.del(`match_session:${userId}`);
-        
+
+        // Remove the user from all queues to ensure there are no lingering
+        // entries in any difficulty/topic. If removeUserFromAllQueues fails
+        // for any reason, fall back to removing from the specific topic.
+        try {
+          await queueService.removeUserFromAllQueues(userId);
+          console.log(`[Controller] Removed user ${userId} from all queues.`);
+        } catch (err) {
+          console.warn('[Controller] removeUserFromAllQueues failed, falling back to removeFromQueue for topic', topic, err);
+          try {
+            await queueService.removeFromQueue(userId, topic);
+          } catch (innerErr) {
+            console.warn('[Controller] removeFromQueue fallback also failed for', userId, innerErr);
+          }
+        }
+
+        // Cancel any pending timeouts for this user and clear prompt/status/session keys.
+        try {
+          const prevTimeoutId = await redisClient.get(`match_timeout_id:${userId}`);
+          if (prevTimeoutId) {
+            await redisClient.set(`match_timeout_cancel:${prevTimeoutId}`, 'true');
+            await redisClient.expire(`match_timeout_cancel:${prevTimeoutId}`, 120);
+          }
+        } catch (err) {
+          console.warn('[Controller] Could not cancel timeout id for', userId, err);
+        }
+
+        // Clean up Redis keys related to the user's pending request.
+        try {
+          await redisClient.del(`match_status:${userId}`);
+          await redisClient.del(`match_session:${userId}`);
+          await redisClient.del(`match_prompt:${userId}`);
+          await redisClient.del(`match_timeout_id:${userId}`);
+        } catch (err) {
+          console.warn('[Controller] Could not clean up Redis keys for', userId, err);
+        }
+
         return res.status(200).json({ message: 'You have been removed from the queue.' });
 
     } catch (error: any) {
@@ -185,6 +247,10 @@ export const getMatchStatus = async (req: AuthenticatedRequest, res: Response) =
   if (sessionId) {
     payload.sessionId = sessionId;
   }
+
+  // Include prompt flag so frontend can show expand popup when necessary
+  const promptFlag = await redisClient.get(`match_prompt:${userId}`);
+  payload.prompt = promptFlag === 'true';
 
   return res.status(200).json(payload);
 
@@ -227,4 +293,63 @@ export const handleRequeue = async (req: Request, res: Response) => {
         console.error('[Controller] Error processing re-queue request:', errorMessage, error);
         return res.status(500).json({ message: 'An internal server error occurred.' });
     }
+};
+
+/**
+ * Handles user's acceptance to expand search to all difficulties after prompt.
+ * Adds the user to all difficulty queues for the given topic and restarts the final timeout.
+ */
+export const acceptExpand = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { topic } = req.body as { topic: string };
+    const userId = req.user!.id;
+
+    // Only allow expansion if user is still pending
+    const status = await redisClient.get(`match_status:${userId}`);
+    if (status !== 'pending') {
+      return res.status(400).json({ message: 'Cannot expand search: you are not currently pending in queue.' });
+    }
+
+    console.log(`[Controller] User ${userId} accepted expand for topic "${topic}". Adding to all difficulty queues.`);
+
+    // Define canonical difficulties based on validation enum casing
+    const difficulties = ['Easy', 'Medium', 'Hard'];
+
+    // Add the user to all difficulty queues for this topic
+    for (const difficulty of difficulties) {
+      const entry: QueueEntry = { userId, difficulty, timestamp: Date.now() };
+      await queueService.addToQueue(entry, topic);
+    }
+
+    // Cancel the previous final timeout by setting an explicit cancel flag for the stored timeoutId.
+    try {
+      const prevTimeoutId = await redisClient.get(`match_timeout_id:${userId}`);
+      if (prevTimeoutId) {
+        console.log(`[Controller] Cancelling previous timeoutId=${prevTimeoutId} for user ${userId}.`);
+        await redisClient.set(`match_timeout_cancel:${prevTimeoutId}`, 'true');
+  // keep the cancel flag short-lived (120s)
+  await redisClient.expire(`match_timeout_cancel:${prevTimeoutId}`, 120);
+      }
+    } catch (err) {
+      console.warn('[Controller] Could not cancel previous timeout id:', err);
+    }
+
+    // Restart final timeout (don't schedule another prompt). One final timeout is sufficient
+    // because final handler removes by userId across all queues.
+  // We only need an entry shell to schedule the final-only timeout. Use a
+  // neutral difficulty (Medium) as a valid placeholder so it follows the
+  // same naming convention as other queue entries.
+  // Schedule a final-only timeout for this user. The API now accepts a
+  // userId directly for final-only scheduling so no placeholder QueueEntry
+  // is necessary.
+  timeoutService.scheduleTimeoutCheck(userId, { withPrompt: false });
+
+    // Clear any prompt flag so frontend stops showing the popup
+    await redisClient.del(`match_prompt:${userId}`);
+
+    return res.status(200).json({ message: 'Search expanded to all difficulties. Timeout restarted for 2 minutes.' });
+  } catch (error: any) {
+    console.error('[Controller] Error processing expand accept:', error);
+    return res.status(500).json({ message: 'An internal server error occurred.' });
+  }
 };
