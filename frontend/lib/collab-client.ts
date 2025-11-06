@@ -77,13 +77,20 @@ export type ActiveSessionResponse = {
   };
 };
 
-export const fetchActiveSessionForUser = async (payload: { userId: string; accessToken: string }) =>
-  handleResponse<ActiveSessionResponse>(
-    await fetch(toUrl('/sessions/active'), {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(payload),
-    }),
-  );
+export const fetchActiveSessionForUser = async (
+  payload: { userId: string; accessToken: string },
+): Promise<ActiveSessionResponse | null> => {
+  const response = await fetch(toUrl('/sessions/active'), {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (response.status === 404) {
+    return null;
+  }
+
+  return handleResponse<ActiveSessionResponse>(response);
+};

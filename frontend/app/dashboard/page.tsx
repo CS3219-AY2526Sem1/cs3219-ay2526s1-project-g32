@@ -1,28 +1,73 @@
-﻿'use client';
+"use client";
 
-import type { Route } from 'next';
-import { Button, Card, Col, ConfigProvider, Layout, Row, Space, Typography } from 'antd';
+import { useEffect, useState } from "react";
+import type { Route } from "next";
+import { useRouter } from "next/navigation";
+import { Button, Card, Col, ConfigProvider, Layout, Row, Space, Typography } from "antd";
 
-import { useAuth } from '../../hooks/useAuth';
-import { useRequireAuth } from '../../hooks/useRequireAuth';
-import { peerPrepTheme } from '../../lib/theme';
+import { useAuth } from "../../hooks/useAuth";
+import { useRequireAuth } from "../../hooks/useRequireAuth";
+import { peerPrepTheme } from "../../lib/theme";
+import { fetchActiveSessionForUser, type ActiveSessionResponse } from "../../lib/collab-client";
 
 const { Header, Content } = Layout;
 const { Title, Text } = Typography;
 
-const LANDING_ROUTE = '/' as Route;
+const LANDING_ROUTE = "/" as Route;
 
 export default function DashboardPage() {
+  const router = useRouter();
   const { isAuthenticated, isReady } = useRequireAuth();
-  const { user, logout } = useAuth();
+  const { user, session, logout } = useAuth();
+
+  const [activeSession, setActiveSession] = useState<ActiveSessionResponse | null>(null);
+  const [checkingActive, setCheckingActive] = useState(false);
+  const [activeError, setActiveError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isReady || !user || !session?.accessToken) {
+      setActiveSession(null);
+      return;
+    }
+
+    let cancelled = false;
+    setCheckingActive(true);
+    setActiveError(null);
+
+    fetchActiveSessionForUser({ userId: user.id, accessToken: session.accessToken })
+      .then((result) => {
+        if (cancelled) return;
+        setActiveSession(result);
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        setActiveSession(null);
+        if (error instanceof Error) {
+          setActiveError(error.message);
+        } else {
+          setActiveError("Unable to check active session");
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setCheckingActive(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isReady, session?.accessToken, user?.id]);
 
   if (!isReady) {
     return (
       <ConfigProvider theme={peerPrepTheme}>
-        <Layout style={{ minHeight: '100vh', background: 'var(--bg)' }}>
+        <Layout style={{ minHeight: "100vh", background: "var(--bg)" }}>
           <Content className="main-content">
-            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '50vh' }}>
-              <Title level={4} style={{ color: 'var(--text)' }}>Loading session...</Title>
+            <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "50vh" }}>
+              <Title level={4} style={{ color: "var(--text)" }}>
+                Loading session...
+              </Title>
             </div>
           </Content>
         </Layout>
@@ -35,21 +80,23 @@ export default function DashboardPage() {
   }
 
   const username =
-    user && typeof user.userMetadata?.username === 'string' ? (user.userMetadata.username as string) : '—';
+    user && typeof user.userMetadata?.username === "string"
+      ? (user.userMetadata.username as string)
+      : "-";
 
   return (
     <ConfigProvider theme={peerPrepTheme}>
-      <Layout style={{ minHeight: '100vh', background: 'var(--bg)' }}>
+      <Layout style={{ minHeight: "100vh", background: "var(--bg)" }}>
         <Header className="header-dark">
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
               <svg
                 width="24"
                 height="24"
                 viewBox="0 0 24 24"
                 fill="none"
                 xmlns="http://www.w3.org/2000/svg"
-                style={{ color: 'var(--primary-600)' }}
+                style={{ color: "var(--primary-600)" }}
               >
                 <path
                   d="M12 2L2 7L12 12L22 7L12 2Z"
@@ -73,7 +120,7 @@ export default function DashboardPage() {
                   strokeLinejoin="round"
                 />
               </svg>
-              <Title level={4} style={{ color: '#fff', margin: 0 }}>
+              <Title level={4} style={{ color: "#fff", margin: 0 }}>
                 PeerPrep Dashboard
               </Title>
             </div>
@@ -90,49 +137,77 @@ export default function DashboardPage() {
         </Header>
 
         <Content className="main-content">
-          {/* background shapes */}
           <div className="blob" aria-hidden="true" />
           <div className="blob-bottom" aria-hidden="true" />
-          {/* soft blur across the whole background */}
           <div className="bg-blur-overlay" aria-hidden="true" />
 
-          <div style={{ position: 'relative', zIndex: 2, maxWidth: '1200px', margin: '0 auto' }}>
-            <Row gutter={[24, 24]}>
-              <Col xs={24} md={12}>
-                <Card className="dark-card" title="Your account" bordered>
-                  <Space direction="vertical">
-                    <Text style={{ color: 'var(--muted)' }}>Username: {username}</Text>
-                    <Text style={{ color: 'var(--muted)' }}>Email: {user?.email ?? 'Unknown'}</Text>
-                    <Text style={{ color: 'var(--muted)' }}>
-                      Email verified: {user?.emailConfirmed ? 'Yes' : 'Pending verification'}
-                    </Text>
-                    <Text style={{ color: 'var(--muted)' }}>
-                      Created: {user ? new Date(user.createdAt).toLocaleString() : '—'}
-                    </Text>
-                  </Space>
+          <div style={{ position: "relative", zIndex: 2, maxWidth: "1200px", margin: "0 auto" }}>
+            <Space direction="vertical" size="large" style={{ width: "100%" }}>
+              {checkingActive && (
+                <Card className="dark-card" bordered>
+                  <Text style={{ color: "var(--muted)" }}>Checking for active sessions...</Text>
                 </Card>
-              </Col>
-              <Col xs={24} md={12}>
-                <Card className="dark-card" title="Start Coding" bordered>
-                  <Space direction="vertical" style={{ width: '100%' }}>
-                    <Text style={{ color: 'var(--muted)' }}>
-                      Ready to practice coding with a peer? Find your perfect coding partner!
-                    </Text>
-                    <Button 
-                      type="primary" 
-                      size="large" 
-                      href="/matching"
-                      style={{ width: '100%', marginTop: '16px' }}
+              )}
+
+              {activeError && !checkingActive && (
+                <Card className="dark-card" bordered>
+                  <Text style={{ color: "#ff7875" }}>{activeError}</Text>
+                </Card>
+              )}
+
+              {activeSession && (
+                <Card className="dark-card" bordered style={{ borderColor: "rgba(64, 169, 255, 0.4)" }}>
+                  <Space direction="vertical" size="middle" style={{ width: "100%" }}>
+                    <Space
+                      align="center"
+                      style={{ width: "100%", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}
                     >
-                      🚀 Find Coding Partner
-                    </Button>
-                    <Text style={{ fontSize: '12px', color: 'var(--muted)' }}>
-                      Choose your topic and difficulty to get matched instantly
+                      <Text style={{ color: "var(--muted)", fontWeight: 600 }}>
+                        Active session: {activeSession.question.title}
+                      </Text>
+                      <Button type="primary" onClick={() => router.push(`/session/${activeSession.sessionId}`)}>
+                        Return to session
+                      </Button>
+                    </Space>
+                    <Text style={{ color: "var(--muted)", fontSize: 12 }}>
+                      Expires at {new Date(activeSession.expiresAt).toLocaleString()}
                     </Text>
                   </Space>
                 </Card>
-              </Col>
-            </Row>
+              )}
+
+              <Row gutter={[24, 24]}>
+                <Col xs={24} md={12}>
+                  <Card className="dark-card" title="Your account" bordered>
+                    <Space direction="vertical">
+                      <Text style={{ color: "var(--muted)" }}>Username: {username}</Text>
+                      <Text style={{ color: "var(--muted)" }}>Email: {user?.email ?? "Unknown"}</Text>
+                      <Text style={{ color: "var(--muted)" }}>
+                        Email verified: {user?.emailConfirmed ? "Yes" : "Pending verification"}
+                      </Text>
+                      <Text style={{ color: "var(--muted)" }}>
+                        Created: {user ? new Date(user.createdAt).toLocaleString() : "-"}
+                      </Text>
+                    </Space>
+                  </Card>
+                </Col>
+                <Col xs={24} md={12}>
+                  <Card className="dark-card" title="Start Coding" bordered>
+                    <Space direction="vertical" style={{ width: "100%" }}>
+                      <Text style={{ color: "var(--muted)" }}>
+                        Ready to practice coding with a peer? Find your perfect coding partner!
+                      </Text>
+                      <Button type="primary" size="large" href="/matching" style={{ width: "100%", marginTop: 16 }}>
+                        Find Coding Partner
+                      </Button>
+                      <Text style={{ fontSize: 12, color: "var(--muted)" }}>
+                        Choose your topic and difficulty to get matched instantly.
+                      </Text>
+                    </Space>
+                  </Card>
+                </Col>
+              </Row>
+            </Space>
           </div>
         </Content>
       </Layout>
