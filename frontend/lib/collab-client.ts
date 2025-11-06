@@ -67,3 +67,23 @@ export const requestSessionToken = async (sessionId: string, payload: { userId: 
       body: JSON.stringify(payload),
     }),
   );
+
+export type ActiveSessionResponse = {
+  sessionId: string;
+  expiresAt: string;
+  question: {
+    id: string;
+    title: string;
+  };
+};
+
+export const fetchActiveSessionForUser = async (payload: { userId: string; accessToken: string }) =>
+  handleResponse<ActiveSessionResponse>(
+    await fetch(toUrl('/sessions/active'), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    }),
+  );
