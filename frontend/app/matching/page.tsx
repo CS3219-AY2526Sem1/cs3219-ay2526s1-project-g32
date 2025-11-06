@@ -252,16 +252,18 @@ export default function MatchingPage() {
           <div style={{ position: 'relative', zIndex: 2, maxWidth: '800px', margin: '0 auto' }}>
             <Row gutter={[24, 24]} justify="center">
               <Col xs={24} sm={20} md={16} lg={12} xl={10}>
-                <Card
-                  className="dark-card"
-                  title={
-                    <Space>
-                      <UserOutlined />
-                      <span>Matchmaking Setup</span>
-                    </Space>
-                  }
-                  bordered
-                >
+                  <Card
+                    className="dark-card"
+                    title={
+                      <Space>
+                        <UserOutlined />
+                        <span>Matchmaking Setup</span>
+                      </Space>
+                    }
+                    bordered
+                    headStyle={{ padding: '16px 24px' }}
+                    bodyStyle={{ padding: '24px' }}
+                  >
               <Space direction="vertical" size="large" style={{ width: '100%' }}>
                 <div>
                   <Paragraph style={{ color: 'var(--muted)' }}>

@@ -90,6 +90,24 @@ export class SessionManager {
     return this.sessions.getById(sessionId);
   }
 
+  async getActiveSessionForUser(userId: string): Promise<SessionSnapshot | null> {
+    const session = await this.sessions.findActiveByUserId(userId);
+    if (!session) {
+      return null;
+    }
+
+    if (session.status === 'ended') {
+      return null;
+    }
+
+    const expiresAtMs = new Date(session.expiresAt).getTime();
+    if (Number.isFinite(expiresAtMs) && expiresAtMs <= Date.now()) {
+      return null;
+    }
+
+    return session;
+  }
+
   async issueSessionToken(
     sessionId: string,
     request: SessionTokenRequest,
