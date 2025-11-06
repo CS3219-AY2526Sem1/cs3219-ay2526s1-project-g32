@@ -156,22 +156,27 @@ export default function DashboardPage() {
               )}
 
               {activeSession && (
-                <Card className="dark-card" bordered style={{ borderColor: "rgba(64, 169, 255, 0.4)" }}>
-                  <Space direction="vertical" size="middle" style={{ width: "100%" }}>
-                    <Space
-                      align="center"
-                      style={{ width: "100%", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}
-                    >
-                      <Text style={{ color: "var(--muted)", fontWeight: 600 }}>
-                        Active session: {activeSession.question.title}
+                <Card
+                  className="dark-card"
+                  bordered
+                  style={{ borderColor: "#52c41a", background: "rgba(82, 196, 26, 0.1)" }}
+                >
+                  <Space
+                    style={{ width: "100%", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}
+                  >
+                    <Space direction="vertical" size={0}>
+                      <Text style={{ color: "#52c41a", fontWeight: 700, fontSize: 18 }}>
+                        You have an active session
                       </Text>
-                      <Button type="primary" onClick={() => router.push(`/session/${activeSession.sessionId}`)}>
-                        Return to session
-                      </Button>
+                      <Text style={{ color: "var(--muted)" }}>{activeSession.question.title}</Text>
                     </Space>
-                    <Text style={{ color: "var(--muted)", fontSize: 12 }}>
-                      Expires at {new Date(activeSession.expiresAt).toLocaleString()}
-                    </Text>
+                    <Button
+                      type="primary"
+                      onClick={() => router.push(`/session/${activeSession.sessionId}`)}
+                      style={{ backgroundColor: "#237804", borderColor: "#237804" }}
+                    >
+                      Return to session
+                    </Button>
                   </Space>
                 </Card>
               )}
