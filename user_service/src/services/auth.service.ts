@@ -26,6 +26,7 @@ export type PublicUser = {
   emailConfirmed: boolean;
   createdAt: string;
   userMetadata: Record<string, unknown>;
+  isAdmin: boolean;
 };
 
 const toPublicUser = (user: User | null): PublicUser | null => {
@@ -36,12 +37,15 @@ const toPublicUser = (user: User | null): PublicUser | null => {
       ? (user.user_metadata as Record<string, unknown>)
       : {};
 
+  const isAdmin = Boolean(metadata.isAdmin);
+
   return {
     id: user.id,
     email: user.email ?? null,
     emailConfirmed: Boolean(user.email_confirmed_at),
     createdAt: user.created_at,
     userMetadata: metadata,
+    isAdmin,
   };
 };
 
@@ -89,6 +93,7 @@ export const registerUser = async ({
     email_confirm: false,
     user_metadata: {
       username,
+      isAdmin: false,
     },
   });
 
@@ -133,4 +138,35 @@ export const getUserById = async (userId: string) => {
   }
 
   return toPublicUser(data.user);
+};
+
+export const updateUserAdminStatus = async (userId: string, isAdmin: boolean) => {
+  const { data: existing, error: fetchError } = await supabaseAdminClient.auth.admin.getUserById(userId);
+
+  if (fetchError) {
+    throw new HttpError(fetchError.status ?? 400, fetchError.message, fetchError);
+  }
+
+  const currentMetadata =
+    existing?.user?.user_metadata && typeof existing.user.user_metadata === 'object'
+      ? (existing.user.user_metadata as Record<string, unknown>)
+      : {};
+
+  const { data, error } = await supabaseAdminClient.auth.admin.updateUserById(userId, {
+    user_metadata: {
+      ...currentMetadata,
+      isAdmin,
+    },
+  });
+
+  if (error) {
+    throw new HttpError(error.status ?? 400, error.message, error);
+  }
+
+  const updated = toPublicUser(data.user);
+  if (!updated) {
+    throw new HttpError(500, 'Failed to read updated user metadata');
+  }
+
+  return updated;
 };

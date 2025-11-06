@@ -5,6 +5,7 @@ import {
     getMatchStatus,
     handleRequeue
 } from '../controllers/matchingControllers';
+import { acceptExpand } from '../controllers/matchingControllers';
 import { cleanupRedis } from '../controllers/cleanupController';
 import { validateRequest } from '../middleware/validateRequest';
 import { authenticate } from '../middleware/authenticate';
@@ -14,6 +15,7 @@ import {
     getMatchStatusSchema,
     handleRequeueSchema
 } from '../validation/matchingSchemas';
+import { expandMatchSchema } from '../validation/matchingSchemas';
 
 const router = Router();
 
@@ -37,6 +39,12 @@ router.delete('/requests', authenticate, validateRequest(deleteMatchRequestSchem
  * @access  Private (Requires authentication)
  */
 router.get('/requests/:userId/status', authenticate, validateRequest(getMatchStatusSchema), getMatchStatus);
+
+/**
+ * POST /api/v1/matching/requests/expand
+ * User accepts expansion to all difficulties after being prompted
+ */
+router.post('/requests/expand', authenticate, validateRequest(expandMatchSchema), acceptExpand);
 
 /**
  * @route   POST /api/v1/matching/requeue
