@@ -183,7 +183,13 @@ export default function DashboardPage() {
 
               <Row gutter={[24, 24]}>
                 <Col xs={24} md={12}>
-                  <Card className="dark-card" title="Your account" bordered>
+                  <Card
+                    className="dark-card"
+                    title="Your account"
+                    bordered
+                    headStyle={{ padding: "16px 24px" }}
+                    bodyStyle={{ padding: "24px" }}
+                  >
                     <Space direction="vertical">
                       <Text style={{ color: "var(--muted)" }}>Username: {username}</Text>
                       <Text style={{ color: "var(--muted)" }}>Email: {user?.email ?? "Unknown"}</Text>
@@ -197,7 +203,13 @@ export default function DashboardPage() {
                   </Card>
                 </Col>
                 <Col xs={24} md={12}>
-                  <Card className="dark-card" title="Start Coding" bordered>
+                  <Card
+                    className="dark-card"
+                    title="Start Coding"
+                    bordered
+                    headStyle={{ padding: "16px 24px" }}
+                    bodyStyle={{ padding: "24px" }}
+                  >
                     <Space direction="vertical" style={{ width: "100%" }}>
                       <Text style={{ color: "var(--muted)" }}>
                         Ready to practice coding with a peer? Find your perfect coding partner!
