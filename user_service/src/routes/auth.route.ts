@@ -6,10 +6,18 @@ import {
   registerHandler,
   resendVerificationHandler,
   validateTokenHandler,
+  setAdminStatusHandler,
 } from '../controllers/auth.controller';
 import { authenticate } from '../middleware/authenticate';
+import { requireAdmin } from '../middleware/requireAdmin';
 import { validateRequest } from '../middleware/validateRequest';
-import { loginSchema, registerSchema, sendMagicLinkSchema, validateTokenSchema } from '../validation/authSchemas';
+import {
+  loginSchema,
+  registerSchema,
+  sendMagicLinkSchema,
+  validateTokenSchema,
+  setAdminStatusSchema,
+} from '../validation/authSchemas';
 
 const router = Router();
 
@@ -18,5 +26,12 @@ router.post('/login', validateRequest(loginSchema), loginHandler);
 router.post('/send-otp', validateRequest(sendMagicLinkSchema), resendVerificationHandler);
 router.post('/token/validate', validateRequest(validateTokenSchema), validateTokenHandler);
 router.get('/me', authenticate, meHandler);
+router.patch(
+  '/users/:userId/admin',
+  authenticate,
+  requireAdmin,
+  validateRequest(setAdminStatusSchema),
+  setAdminStatusHandler,
+);
 
 export const authRouter = router;

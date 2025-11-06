@@ -7,6 +7,7 @@ import { HttpError } from '../utils/httpError';
 export type AuthClaims = JwtPayload & {
   email?: string | null;
   role?: string;
+  user_metadata?: Record<string, unknown>;
 };
 
 export interface AuthenticatedRequest extends Request {
@@ -14,6 +15,7 @@ export interface AuthenticatedRequest extends Request {
     userId: string;
     email?: string | null;
     role?: string;
+    isAdmin: boolean;
     claims: AuthClaims;
     token: string;
   };
@@ -47,10 +49,16 @@ export const authenticate = (
       return;
     }
 
+    const isAdmin =
+      decoded.user_metadata && typeof decoded.user_metadata === 'object'
+        ? Boolean((decoded.user_metadata as Record<string, unknown>).isAdmin)
+        : false;
+
     req.auth = {
       userId,
       email: decoded.email ?? null,
       role: typeof decoded.role === 'string' ? decoded.role : undefined,
+      isAdmin,
       claims: decoded,
       token,
     };
