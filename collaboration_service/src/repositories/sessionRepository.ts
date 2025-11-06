@@ -7,6 +7,7 @@ import { sessionMetaKey } from './keys';
 export interface SessionRepository {
   create(session: SessionSnapshot): Promise<void>;
   getById(sessionId: string): Promise<SessionSnapshot | null>;
+  findActiveByUserId(userId: string): Promise<SessionSnapshot | null>;
   update(session: SessionSnapshot): Promise<void>;
   markEnded(sessionId: string, endedAtIso: string): Promise<void>;
   delete(sessionId: string): Promise<void>;
@@ -34,6 +35,54 @@ export class RedisSessionRepository implements SessionRepository {
     }
 
     return this.parseSnapshot(raw);
+  }
+
+  async findActiveByUserId(userId: string): Promise<SessionSnapshot | null> {
+    let cursor = '0';
+
+    do {
+      const [nextCursor, keys] = await this.client.scan(
+        cursor,
+        'MATCH',
+        'session:*:meta',
+        'COUNT',
+        100,
+      );
+
+      if (keys.length > 0) {
+        const values = await this.client.mget(keys);
+        for (const raw of values) {
+          if (!raw) continue;
+          let session: SessionSnapshot | null = null;
+          try {
+            session = this.parseSnapshot(raw);
+          } catch {
+            continue;
+          }
+
+          if (session.status === 'ended') {
+            continue;
+          }
+
+          const expiresAtMs = new Date(session.expiresAt).getTime();
+          if (Number.isFinite(expiresAtMs) && expiresAtMs <= Date.now()) {
+            continue;
+          }
+
+          const isParticipant = session.participants.some(
+            (participant) => participant.userId === userId,
+          );
+
+          if (isParticipant) {
+            return session;
+          }
+        }
+      }
+
+      cursor = nextCursor;
+    } while (cursor !== '0');
+
+    return null;
   }
 
   async update(session: SessionSnapshot): Promise<void> {

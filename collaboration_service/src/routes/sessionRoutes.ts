@@ -1,6 +1,11 @@
 import { Router } from 'express';
 
-import { SessionCreateSchema, SessionTokenRequestSchema, SessionIdParamsSchema } from '../schemas';
+import {
+  SessionActiveRequestSchema,
+  SessionCreateSchema,
+  SessionTokenRequestSchema,
+  SessionIdParamsSchema,
+} from '../schemas';
 import type { SessionController } from '../controllers';
 import { validateBody, validateParams } from '../middleware';
 
@@ -28,6 +33,12 @@ export const createSessionRouter = ({ controller }: SessionRouteDependencies) =>
     validateParams(SessionIdParamsSchema),
     validateBody(SessionTokenRequestSchema),
     controller.issueToken,
+  );
+
+  router.post(
+    '/sessions/active',
+    validateBody(SessionActiveRequestSchema),
+    controller.getActiveSessionForUser,
   );
 
   return router;

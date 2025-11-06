@@ -1,6 +1,12 @@
 import type { Request, Response, NextFunction } from 'express';
 
-import { SessionCreateResponseSchema, SessionCreateSchema, SessionIdParamsSchema, SessionTokenRequestSchema } from '../schemas';
+import {
+  SessionActiveRequestSchema,
+  SessionCreateResponseSchema,
+  SessionCreateSchema,
+  SessionIdParamsSchema,
+  SessionTokenRequestSchema,
+} from '../schemas';
 import type { SessionManager } from '../services/sessionManager';
 
 type QuestionServiceResponse = {
@@ -131,6 +137,35 @@ export class SessionController {
         wsUrl: this.websocketBaseUrl,
         sessionToken: token,
         expiresIn,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  getActiveSessionForUser = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const body = SessionActiveRequestSchema.parse(req.body);
+
+      const isValid = await this.validateAccessToken(body.accessToken, body.userId);
+      if (!isValid) {
+        res.status(403).json({ error: 'Forbidden', message: 'User is inactive' });
+        return;
+      }
+
+      const session = await this.sessionManager.getActiveSessionForUser(body.userId);
+      if (!session) {
+        res.status(404).json({ error: 'NotFoundError', message: 'No active session' });
+        return;
+      }
+
+      res.json({
+        sessionId: session.sessionId,
+        expiresAt: session.expiresAt,
+        question: {
+          id: session.question.questionId,
+          title: session.question.title,
+        },
       });
     } catch (error) {
       next(error);

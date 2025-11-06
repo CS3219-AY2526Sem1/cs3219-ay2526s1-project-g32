@@ -79,6 +79,12 @@ export const SessionTokenRequestSchema = z.object({
 });
 export type SessionTokenRequest = z.infer<typeof SessionTokenRequestSchema>;
 
+export const SessionActiveRequestSchema = z.object({
+  userId: z.string().min(1),
+  accessToken: z.string().min(1),
+});
+export type SessionActiveRequest = z.infer<typeof SessionActiveRequestSchema>;
+
 export const SessionTokenResponseSchema = z.object({
   wsUrl: z.string().url(),
   sessionToken: z.string().min(1),
