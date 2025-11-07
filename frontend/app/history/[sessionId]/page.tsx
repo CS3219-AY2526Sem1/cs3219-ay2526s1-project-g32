@@ -66,11 +66,6 @@ const markdownComponents: Components = {
   ),
 };
 
-type AttemptParticipant = {
-  userId: string;
-  displayName?: string;
-};
-
 const normalizeLanguage = (language?: string | null) =>
   language ? language.toLowerCase() : 'javascript';
 
@@ -78,42 +73,6 @@ const resolveMonacoLanguage = (language: string) => (language === 'c' ? 'cpp' : 
 
 const labelForLanguage = (language: string) =>
   LANGUAGE_LABELS[language] ?? language.toUpperCase();
-
-type ParticipantPayload = { userId?: unknown; displayName?: unknown };
-
-const toParticipantList = (participants: SessionAttemptRecord['participants']) => {
-  if (!participants) {
-    return [];
-  }
-
-  if (Array.isArray(participants)) {
-    return participants as ParticipantPayload[];
-  }
-
-  if (typeof participants === 'object') {
-    return Object.values(participants) as ParticipantPayload[];
-  }
-
-  return [];
-};
-
-const parseParticipants = (
-  participants: SessionAttemptRecord['participants'],
-): AttemptParticipant[] => {
-  return toParticipantList(participants)
-    .map((entry): AttemptParticipant | null => {
-      if (!entry || typeof entry !== 'object' || typeof entry.userId !== 'string') {
-        return null;
-      }
-
-      return {
-        userId: entry.userId,
-        displayName:
-          typeof entry.displayName === 'string' ? entry.displayName : undefined,
-      };
-    })
-    .filter((entry): entry is AttemptParticipant => entry !== null);
-};
 
 type LanguageField = typeof LANGUAGE_FIELD_MAP[keyof typeof LANGUAGE_FIELD_MAP];
 
@@ -229,8 +188,6 @@ export default function SessionHistoryPage({ params }: { params: { sessionId: st
       cancelled = true;
     };
   }, [authReady, isAuthenticated, authSession?.accessToken, params.sessionId]);
-
-  const participants = useMemo(() => parseParticipants(attempt?.participants ?? null), [attempt]);
 
   const languageOptions = useMemo(() => {
     return Object.keys(codeByLanguage).map((language) => ({
@@ -445,21 +402,6 @@ export default function SessionHistoryPage({ params }: { params: { sessionId: st
                         </Space>
                       )}
                     </div>
-
-                    {participants.length > 0 && (
-                      <div>
-                        <Text style={{ color: 'var(--muted)', display: 'block', marginBottom: 8 }}>
-                          Participants
-                        </Text>
-                        <Space size={[12, 12]} wrap>
-                          {participants.map((participant) => (
-                            <Tag key={participant.userId} color="volcano">
-                              {participant.displayName ?? participant.userId}
-                            </Tag>
-                          ))}
-                        </Space>
-                      </div>
-                    )}
 
                     <div className="markdown-body">
                       <ReactMarkdown components={markdownComponents}>{description}</ReactMarkdown>

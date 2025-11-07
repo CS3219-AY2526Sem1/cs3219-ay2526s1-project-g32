@@ -121,7 +121,7 @@ export class RedisSessionRepository implements SessionRepository {
       const parsed = JSON.parse(raw) as unknown;
       return SessionSnapshotSchema.parse(parsed);
     } catch (error) {
-      throw new Error('Failed to parse session payload from Redis');
+      throw new Error('Failed to parse session payload from Redis', { cause: error });
     }
   }
 }

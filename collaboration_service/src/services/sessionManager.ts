@@ -206,7 +206,7 @@ export class SessionManager {
     await this.sessions.update(updated);
   }
 
-  async endSession(sessionId: string, _reason?: string): Promise<void> {
+  async endSession(sessionId: string, reason?: string): Promise<void> {
     const session = await this.sessions.getById(sessionId);
     if (!session) {
       return;
@@ -215,6 +215,8 @@ export class SessionManager {
     if (session.status === 'ended') {
       return;
     }
+
+    logger.info({ sessionId, reason }, 'Ending collaboration session');
 
     const endedAt = new Date().toISOString();
     const endedSnapshot: SessionSnapshot = SessionSnapshotSchema.parse({

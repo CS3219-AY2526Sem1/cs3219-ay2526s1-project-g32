@@ -26,6 +26,8 @@ export default function DashboardPage() {
   const { isAuthenticated, isReady } = useRequireAuth();
   const { user, session, logout } = useAuth();
 
+  const accessToken = session?.accessToken ?? null;
+  const userId = user?.id ?? null;
   const [activeSession, setActiveSession] = useState<ActiveSessionResponse | null>(null);
   const [checkingActive, setCheckingActive] = useState(false);
   const [activeError, setActiveError] = useState<string | null>(null);
@@ -34,7 +36,7 @@ export default function DashboardPage() {
   const [historyError, setHistoryError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!isReady || !user || !session?.accessToken) {
+    if (!isReady || !userId || !accessToken) {
       setActiveSession(null);
       return;
     }
@@ -43,7 +45,7 @@ export default function DashboardPage() {
     setCheckingActive(true);
     setActiveError(null);
 
-    fetchActiveSessionForUser({ userId: user.id, accessToken: session.accessToken })
+    fetchActiveSessionForUser({ userId, accessToken })
       .then((result) => {
         if (cancelled) return;
         setActiveSession(result);
@@ -66,10 +68,10 @@ export default function DashboardPage() {
     return () => {
       cancelled = true;
     };
-  }, [isReady, session?.accessToken, user?.id]);
+  }, [accessToken, isReady, userId]);
 
   useEffect(() => {
-    if (!isReady || !isAuthenticated || !session?.accessToken) {
+    if (!isReady || !isAuthenticated || !accessToken) {
       setHistoryItems([]);
       setHistoryLoading(false);
       return;
@@ -81,7 +83,7 @@ export default function DashboardPage() {
 
     const loadHistory = async () => {
       try {
-        const { attempts } = await fetchUserHistory(session.accessToken);
+        const { attempts } = await fetchUserHistory(accessToken);
         if (cancelled) return;
 
         if (attempts.length === 0) {
@@ -94,7 +96,7 @@ export default function DashboardPage() {
             try {
               const { attempt: detail } = await fetchSessionAttemptDetail(
                 attempt.session_attempt_id,
-                session.accessToken,
+                accessToken,
               );
               return {
                 sessionAttemptId: detail.id ?? attempt.session_attempt_id,
@@ -167,7 +169,7 @@ export default function DashboardPage() {
     return () => {
       cancelled = true;
     };
-  }, [isAuthenticated, isReady, session?.accessToken]);
+  }, [accessToken, isAuthenticated, isReady]);
 
   if (!isReady) {
     return (

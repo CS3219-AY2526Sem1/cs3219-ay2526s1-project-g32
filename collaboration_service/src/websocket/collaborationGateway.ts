@@ -1,4 +1,5 @@
 import type { IncomingMessage, Server as HttpServer } from 'http';
+import type { Socket } from 'net';
 import jwt, { type JwtPayload } from 'jsonwebtoken';
 import { WebSocketServer } from 'ws';
 import { setupWSConnection } from '@y/websocket-server/utils';
@@ -50,7 +51,7 @@ const extractToken = (req: IncomingMessage): string | null => {
   }
 };
 
-const unauthorized = (socket: any, code = '401', message = 'Unauthorized') => {
+const unauthorized = (socket: Socket, code = '401', message = 'Unauthorized') => {
   try {
     socket.write(`HTTP/1.1 ${code} ${message}\r\n\r\n`);
   } catch {
@@ -216,7 +217,7 @@ export const attachCollaborationGateway = (server: HttpServer, options: Collabor
     setupWSConnection(ws, request, { docName: yDocName, gc: true });
   });
 
-  server.on('upgrade', (req: UpgradeRequest, socket, head) => {
+  server.on('upgrade', (req: UpgradeRequest, socket: Socket, head) => {
     if (!req.url) {
       unauthorized(socket, '400', 'Bad Request');
       return;
