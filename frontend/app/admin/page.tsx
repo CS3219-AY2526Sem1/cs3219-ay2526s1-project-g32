@@ -22,11 +22,13 @@ import {
 } from 'antd';
 import {
   CloseOutlined,
+  DeleteOutlined,
   EditOutlined,
   FileTextOutlined,
   PlusOutlined,
   SaveOutlined,
   SearchOutlined,
+  WarningOutlined,
 } from '@ant-design/icons';
 
 import { useAuth } from '../../hooks/useAuth';
@@ -36,6 +38,7 @@ import {
   getQuestionById,
   getQuestionBySlug,
   updateQuestion,
+  deleteQuestion,
   type CreateQuestionPayload 
 } from '../../lib/api-client';
 
@@ -77,6 +80,7 @@ export default function AdminPage() {
   const [success, setSuccess] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
+  const [isDeleteMode, setIsDeleteMode] = useState(false);
   const [searchSlug, setSearchSlug] = useState('');
   const [loadingQuestion, setLoadingQuestion] = useState(false);
   const [currentQuestionId, setCurrentQuestionId] = useState<number | null>(null);
@@ -104,6 +108,17 @@ export default function AdminPage() {
 
   const handleModeChange = (checked: boolean) => {
     setIsEditMode(checked);
+    setIsDeleteMode(false);
+    setError(null);
+    setSuccess(null);
+    setCurrentQuestionId(null);
+    reset();
+    setSearchSlug('');
+  };
+
+  const handleDeleteModeChange = (checked: boolean) => {
+    setIsDeleteMode(checked);
+    setIsEditMode(false);
     setError(null);
     setSuccess(null);
     setCurrentQuestionId(null);
@@ -148,6 +163,56 @@ export default function AdminPage() {
       setSuccess(`Question "${response.title}" loaded successfully!`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load question. Check the slug or ID.');
+    } finally {
+      setLoadingQuestion(false);
+    }
+  };
+
+  const handleDeleteQuestion = async () => {
+    if (!searchSlug.trim()) {
+      setError('Please enter a slug or ID to delete');
+      return;
+    }
+
+    setLoadingQuestion(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      let questionId: number;
+      let questionTitle: string = '';
+      
+      // Try to parse as ID first (if it's a number)
+      if (/^\d+$/.test(searchSlug)) {
+        questionId = parseInt(searchSlug);
+        // Fetch the question to get its title for confirmation
+        const response = await getQuestionById(questionId);
+        questionTitle = response.title;
+      } else {
+        // Otherwise treat as slug
+        const response = await getQuestionBySlug(searchSlug);
+        questionId = response.id;
+        questionTitle = response.title;
+      }
+      
+      // Show confirmation dialog
+      const confirmed = window.confirm(
+        `⚠️ Warning! This action cannot be undone.\n\n` +
+        `Are you sure you want to delete the question:\n"${questionTitle}" (ID: ${questionId})?\n\n` +
+        `This will permanently remove the question from the database.`
+      );
+      
+      if (!confirmed) {
+        setLoadingQuestion(false);
+        return;
+      }
+      
+      // Delete the question
+      await deleteQuestion(questionId);
+      setSuccess(`Question "${questionTitle}" (ID: ${questionId}) has been permanently deleted.`);
+      setSearchSlug('');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete question. Check the slug or ID.');
     } finally {
       setLoadingQuestion(false);
     }
@@ -271,18 +336,34 @@ export default function AdminPage() {
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <FileTextOutlined style={{ fontSize: 24, color: 'var(--primary-600)' }} />
               <Title level={4} style={{ color: '#fff', margin: 0 }}>
-                PeerPrep Admin - {isEditMode ? 'Edit' : 'Create'} Question
+                PeerPrep Admin - {isDeleteMode ? 'Delete' : isEditMode ? 'Edit' : 'Create'} Question
               </Title>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <span style={{ color: 'rgba(255,255,255,0.7)' }}>Create</span>
-              <Switch 
-                checked={isEditMode} 
-                onChange={handleModeChange}
-                checkedChildren={<EditOutlined />}
-                unCheckedChildren={<PlusOutlined />}
-              />
-              <span style={{ color: 'rgba(255,255,255,0.7)' }}>Edit</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13 }}>Create</span>
+                <Switch 
+                  checked={isEditMode} 
+                  onChange={handleModeChange}
+                  checkedChildren={<EditOutlined />}
+                  unCheckedChildren={<PlusOutlined />}
+                  disabled={isDeleteMode}
+                />
+                <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13 }}>Edit</span>
+              </div>
+              <Divider type="vertical" style={{ height: 24, background: 'rgba(255,255,255,0.2)' }} />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Switch 
+                  checked={isDeleteMode} 
+                  onChange={handleDeleteModeChange}
+                  checkedChildren={<DeleteOutlined />}
+                  unCheckedChildren={<CloseOutlined />}
+                  style={{ 
+                    background: isDeleteMode ? '#ff4d4f' : undefined 
+                  }}
+                />
+                <span style={{ color: isDeleteMode ? '#ff4d4f' : 'rgba(255,255,255,0.7)', fontSize: 13 }}>Delete</span>
+              </div>
             </div>
           </div>
         </Header>
@@ -311,44 +392,128 @@ export default function AdminPage() {
             >
               <form onSubmit={handleSubmit(onSubmit)}>
                 <Space direction="vertical" size="large" style={{ width: '100%' }}>
-                  {/* Mode Toggle and Search Section */}
-                  {isEditMode && (
+                  
+                  {/* Delete Mode View */}
+                  {isDeleteMode ? (
                     <Card 
                       size="small" 
                       style={{ 
-                        background: 'rgba(99, 102, 241, 0.1)', 
-                        border: '1px solid rgba(99, 102, 241, 0.3)' 
+                        background: 'rgba(255, 77, 79, 0.1)', 
+                        border: '2px solid rgba(255, 77, 79, 0.4)' 
                       }}
                     >
                       <Space direction="vertical" size="middle" style={{ width: '100%' }}>
-                        <Title level={5} style={{ margin: 0, color: '#fff' }}>
-                          Load Question for Editing
-                        </Title>
-                        <Paragraph type="secondary" style={{ marginBottom: 0 }}>
-                          Enter the question slug (e.g., two-sum) or ID to load existing question data
-                        </Paragraph>
-                        <Space.Compact style={{ width: '100%' }}>
-                          <Input
-                            size="large"
-                            placeholder="Enter slug (e.g., two-sum) or ID"
-                            value={searchSlug}
-                            onChange={(e) => setSearchSlug(e.target.value)}
-                            onPressEnter={handleLoadQuestion}
-                            disabled={loadingQuestion}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                          <WarningOutlined style={{ fontSize: 24, color: '#ff4d4f' }} />
+                          <Title level={4} style={{ margin: 0, color: '#ff4d4f' }}>
+                            Delete Question
+                          </Title>
+                        </div>
+                        
+                        <Alert
+                          message="Warning! This action cannot be undone."
+                          description="Deleting a question will permanently remove it from the database. Make sure you have the correct question before proceeding."
+                          type="warning"
+                          showIcon
+                          icon={<WarningOutlined />}
+                          style={{ 
+                            background: 'rgba(250, 173, 20, 0.1)',
+                            border: '1px solid rgba(250, 173, 20, 0.3)'
+                          }}
+                        />
+
+                        <Divider style={{ margin: '12px 0', borderColor: 'rgba(255, 77, 79, 0.2)' }} />
+
+                        <div>
+                          <Paragraph style={{ marginBottom: 8, color: 'rgba(255,255,255,0.85)' }}>
+                            Enter the question slug or ID to delete:
+                          </Paragraph>
+                          <Space.Compact style={{ width: '100%' }}>
+                            <Input
+                              size="large"
+                              placeholder="Enter slug (e.g., two-sum) or ID"
+                              value={searchSlug}
+                              onChange={(e) => setSearchSlug(e.target.value)}
+                              onPressEnter={handleDeleteQuestion}
+                              disabled={loadingQuestion}
+                              style={{ borderColor: 'rgba(255, 77, 79, 0.3)' }}
+                            />
+                            <Button
+                              danger
+                              type="primary"
+                              size="large"
+                              icon={<DeleteOutlined />}
+                              onClick={handleDeleteQuestion}
+                              loading={loadingQuestion}
+                            >
+                              Delete Question
+                            </Button>
+                          </Space.Compact>
+                        </div>
+
+                        {error && (
+                          <Alert
+                            message="Error"
+                            description={error}
+                            type="error"
+                            showIcon
+                            closable
+                            onClose={() => setError(null)}
                           />
-                          <Button
-                            type="primary"
-                            size="large"
-                            icon={<SearchOutlined />}
-                            onClick={handleLoadQuestion}
-                            loading={loadingQuestion}
-                          >
-                            Load
-                          </Button>
-                        </Space.Compact>
+                        )}
+                        
+                        {success && (
+                          <Alert
+                            message="Success"
+                            description={success}
+                            type="success"
+                            showIcon
+                            closable
+                            onClose={() => setSuccess(null)}
+                          />
+                        )}
                       </Space>
                     </Card>
-                  )}
+                  ) : (
+                    <>
+                      {/* Mode Toggle and Search Section */}
+                      {isEditMode && (
+                        <Card 
+                          size="small" 
+                          style={{ 
+                            background: 'rgba(99, 102, 241, 0.1)', 
+                            border: '1px solid rgba(99, 102, 241, 0.3)' 
+                          }}
+                        >
+                          <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+                            <Title level={5} style={{ margin: 0, color: '#fff' }}>
+                              Load Question for Editing
+                            </Title>
+                            <Paragraph type="secondary" style={{ marginBottom: 0 }}>
+                              Enter the question slug (e.g., two-sum) or ID to load existing question data
+                            </Paragraph>
+                            <Space.Compact style={{ width: '100%' }}>
+                              <Input
+                                size="large"
+                                placeholder="Enter slug (e.g., two-sum) or ID"
+                                value={searchSlug}
+                                onChange={(e) => setSearchSlug(e.target.value)}
+                                onPressEnter={handleLoadQuestion}
+                                disabled={loadingQuestion}
+                              />
+                              <Button
+                                type="primary"
+                                size="large"
+                                icon={<SearchOutlined />}
+                                onClick={handleLoadQuestion}
+                                loading={loadingQuestion}
+                              >
+                                Load
+                              </Button>
+                            </Space.Compact>
+                          </Space>
+                        </Card>
+                      )}
 
                   {/* Basic Information */}
                   <div>
@@ -572,40 +737,44 @@ export default function AdminPage() {
                   </div>
 
                   {/* Error/Success Messages */}
-                  {error && (
+                  {!isDeleteMode && error && (
                     <Alert type="error" showIcon message={error} closable onClose={() => setError(null)} />
                   )}
-                  {success && (
+                  {!isDeleteMode && success && (
                     <Alert type="success" showIcon message={success} closable onClose={() => setSuccess(null)} />
                   )}
 
                   {/* Action Buttons */}
-                  <Space size="middle" style={{ width: '100%', justifyContent: 'flex-end' }}>
-                    <Button
-                      size="large"
-                      icon={<CloseOutlined />}
-                      onClick={() => {
-                        reset();
-                        setSearchSlug('');
-                        setCurrentQuestionId(null);
-                        setError(null);
-                        setSuccess(null);
-                      }}
-                      disabled={loading}
-                    >
-                      Reset
-                    </Button>
-                    <Button
-                      type="primary"
-                      size="large"
-                      icon={<SaveOutlined />}
-                      htmlType="submit"
-                      loading={loading}
-                      disabled={isEditMode && !currentQuestionId}
-                    >
-                      {isEditMode ? 'Update Question' : 'Create Question'}
-                    </Button>
-                  </Space>
+                  {!isDeleteMode && (
+                    <Space size="middle" style={{ width: '100%', justifyContent: 'flex-end' }}>
+                      <Button
+                        size="large"
+                        icon={<CloseOutlined />}
+                        onClick={() => {
+                          reset();
+                          setSearchSlug('');
+                          setCurrentQuestionId(null);
+                          setError(null);
+                          setSuccess(null);
+                        }}
+                        disabled={loading}
+                      >
+                        Reset
+                      </Button>
+                      <Button
+                        type="primary"
+                        size="large"
+                        icon={<SaveOutlined />}
+                        htmlType="submit"
+                        loading={loading}
+                        disabled={isEditMode && !currentQuestionId}
+                      >
+                        {isEditMode ? 'Update Question' : 'Create Question'}
+                      </Button>
+                    </Space>
+                  )}
+                    </>
+                  )}
                 </Space>
               </form>
             </Card>
