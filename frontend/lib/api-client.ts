@@ -81,6 +81,11 @@ export type SessionAttemptRecord = {
   question_title: string | null;
   started_at: string | null;
   ended_at: string | null;
+  code_python: string | null;
+  code_c: string | null;
+  code_cpp: string | null;
+  code_java: string | null;
+  code_javascript: string | null;
   participants?: Record<string, unknown> | null;
 };
 
