@@ -45,7 +45,9 @@ export class RedisPresenceRepository implements PresenceRepository {
       const parsed = JSON.parse(value) as unknown;
       return PresenceRecordSchema.parse(parsed);
     } catch (error) {
-      throw new Error('Failed to parse presence record from Redis', { cause: error });
+      const err = new Error('Failed to parse presence record from Redis');
+      (err as Error & { cause?: unknown }).cause = error;
+      throw err;
     }
   }
 }
