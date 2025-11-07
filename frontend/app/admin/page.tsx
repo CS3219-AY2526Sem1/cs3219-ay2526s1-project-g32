@@ -16,18 +16,28 @@ import {
   Select,
   Space, 
   Spin, 
+  Switch,
   Tag,
   Typography 
 } from 'antd';
 import {
   CloseOutlined,
+  EditOutlined,
   FileTextOutlined,
+  PlusOutlined,
   SaveOutlined,
+  SearchOutlined,
 } from '@ant-design/icons';
 
 import { useAuth } from '../../hooks/useAuth';
 import { peerPrepTheme } from '../../lib/theme';
-import { createQuestion, type CreateQuestionPayload } from '../../lib/api-client';
+import { 
+  createQuestion, 
+  getQuestionById,
+  getQuestionBySlug,
+  updateQuestion,
+  type CreateQuestionPayload 
+} from '../../lib/api-client';
 
 const { Header, Content } = Layout;
 const { Title, Paragraph } = Typography;
@@ -66,11 +76,16 @@ export default function AdminPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [searchSlug, setSearchSlug] = useState('');
+  const [loadingQuestion, setLoadingQuestion] = useState(false);
+  const [currentQuestionId, setCurrentQuestionId] = useState<number | null>(null);
 
   const {
     control,
     handleSubmit,
     reset,
+    setValue,
     formState: { errors },
   } = useForm<FormValues>({
     defaultValues: {
@@ -87,32 +102,109 @@ export default function AdminPage() {
     },
   });
 
+  const handleModeChange = (checked: boolean) => {
+    setIsEditMode(checked);
+    setError(null);
+    setSuccess(null);
+    setCurrentQuestionId(null);
+    reset();
+    setSearchSlug('');
+  };
+
+  const handleLoadQuestion = async () => {
+    if (!searchSlug.trim()) {
+      setError('Please enter a slug or ID to search');
+      return;
+    }
+
+    setLoadingQuestion(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      let response;
+      
+      // Try to parse as ID first (if it's a number)
+      if (/^\d+$/.test(searchSlug)) {
+        response = await getQuestionById(parseInt(searchSlug));
+      } else {
+        // Otherwise treat as slug
+        response = await getQuestionBySlug(searchSlug);
+      }
+      
+      // Populate form with existing data
+      setValue('title', response.title);
+      setValue('slug', response.slug);
+      setValue('description', response.description);
+      setValue('difficulty', response.difficulty as 'Easy' | 'Medium' | 'Hard');
+      setValue('topics', response.topics);
+      setValue('starter_python', response.starterCode?.python || '');
+      setValue('starter_c', response.starterCode?.c || '');
+      setValue('starter_cpp', response.starterCode?.cpp || '');
+      setValue('starter_java', response.starterCode?.java || '');
+      setValue('starter_javascript', response.starterCode?.javascript || '');
+      
+      setCurrentQuestionId(response.id);
+      setSuccess(`Question "${response.title}" loaded successfully!`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load question. Check the slug or ID.');
+    } finally {
+      setLoadingQuestion(false);
+    }
+  };
+
   const onSubmit = async (values: FormValues) => {
     setError(null);
     setSuccess(null);
     setLoading(true);
 
     try {
-      const payload: CreateQuestionPayload = {
-        ...values,
-        // Only include starter code if provided
-        starter_python: values.starter_python || undefined,
-        starter_c: values.starter_c || undefined,
-        starter_cpp: values.starter_cpp || undefined,
-        starter_java: values.starter_java || undefined,
-        starter_javascript: values.starter_javascript || undefined,
-      };
+      if (isEditMode) {
+        // Edit mode - update existing question
+        if (!currentQuestionId) {
+          setError('Please load a question first before updating');
+          setLoading(false);
+          return;
+        }
 
-      await createQuestion(payload);
-      setSuccess('Question created successfully!');
-      
-      // Reset form after success
-      setTimeout(() => {
-        reset();
-        setSuccess(null);
-      }, 2000);
+        const payload: Partial<CreateQuestionPayload> = {
+          ...(values.title && { title: values.title }),
+          ...(values.slug && { slug: values.slug }),
+          ...(values.description && { description: values.description }),
+          ...(values.difficulty && { difficulty: values.difficulty }),
+          ...(values.topics && values.topics.length > 0 && { topics: values.topics }),
+          ...(values.starter_python && { starter_python: values.starter_python }),
+          ...(values.starter_c && { starter_c: values.starter_c }),
+          ...(values.starter_cpp && { starter_cpp: values.starter_cpp }),
+          ...(values.starter_java && { starter_java: values.starter_java }),
+          ...(values.starter_javascript && { starter_javascript: values.starter_javascript }),
+        };
+
+        await updateQuestion(currentQuestionId, payload);
+        setSuccess('Question updated successfully!');
+      } else {
+        // Create mode - create new question
+        const payload: CreateQuestionPayload = {
+          ...values,
+          // Only include starter code if provided
+          starter_python: values.starter_python || undefined,
+          starter_c: values.starter_c || undefined,
+          starter_cpp: values.starter_cpp || undefined,
+          starter_java: values.starter_java || undefined,
+          starter_javascript: values.starter_javascript || undefined,
+        };
+
+        await createQuestion(payload);
+        setSuccess('Question created successfully!');
+        
+        // Reset form after success in create mode
+        setTimeout(() => {
+          reset();
+          setSuccess(null);
+        }, 2000);
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create question');
+      setError(err instanceof Error ? err.message : `Failed to ${isEditMode ? 'update' : 'create'} question`);
     } finally {
       setLoading(false);
     }
@@ -179,8 +271,18 @@ export default function AdminPage() {
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <FileTextOutlined style={{ fontSize: 24, color: 'var(--primary-600)' }} />
               <Title level={4} style={{ color: '#fff', margin: 0 }}>
-                PeerPrep Admin - Create Question
+                PeerPrep Admin - {isEditMode ? 'Edit' : 'Create'} Question
               </Title>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <span style={{ color: 'rgba(255,255,255,0.7)' }}>Create</span>
+              <Switch 
+                checked={isEditMode} 
+                onChange={handleModeChange}
+                checkedChildren={<EditOutlined />}
+                unCheckedChildren={<PlusOutlined />}
+              />
+              <span style={{ color: 'rgba(255,255,255,0.7)' }}>Edit</span>
             </div>
           </div>
         </Header>
@@ -209,6 +311,45 @@ export default function AdminPage() {
             >
               <form onSubmit={handleSubmit(onSubmit)}>
                 <Space direction="vertical" size="large" style={{ width: '100%' }}>
+                  {/* Mode Toggle and Search Section */}
+                  {isEditMode && (
+                    <Card 
+                      size="small" 
+                      style={{ 
+                        background: 'rgba(99, 102, 241, 0.1)', 
+                        border: '1px solid rgba(99, 102, 241, 0.3)' 
+                      }}
+                    >
+                      <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+                        <Title level={5} style={{ margin: 0, color: '#fff' }}>
+                          Load Question for Editing
+                        </Title>
+                        <Paragraph type="secondary" style={{ marginBottom: 0 }}>
+                          Enter the question slug (e.g., two-sum) or ID to load existing question data
+                        </Paragraph>
+                        <Space.Compact style={{ width: '100%' }}>
+                          <Input
+                            size="large"
+                            placeholder="Enter slug (e.g., two-sum) or ID"
+                            value={searchSlug}
+                            onChange={(e) => setSearchSlug(e.target.value)}
+                            onPressEnter={handleLoadQuestion}
+                            disabled={loadingQuestion}
+                          />
+                          <Button
+                            type="primary"
+                            size="large"
+                            icon={<SearchOutlined />}
+                            onClick={handleLoadQuestion}
+                            loading={loadingQuestion}
+                          >
+                            Load
+                          </Button>
+                        </Space.Compact>
+                      </Space>
+                    </Card>
+                  )}
+
                   {/* Basic Information */}
                   <div>
                     <Title level={4} style={{ marginBottom: 16 }}>Basic Information</Title>
@@ -217,12 +358,12 @@ export default function AdminPage() {
                       label="Title"
                       validateStatus={errors.title ? 'error' : ''}
                       help={errors.title?.message}
-                      required
+                      required={!isEditMode}
                     >
                       <Controller
                         name="title"
                         control={control}
-                        rules={{ required: 'Title is required' }}
+                        rules={{ required: isEditMode ? false : 'Title is required' }}
                         render={({ field }) => (
                           <Input
                             {...field}
@@ -238,13 +379,13 @@ export default function AdminPage() {
                       label="Slug"
                       validateStatus={errors.slug ? 'error' : ''}
                       help={errors.slug?.message || 'URL-friendly identifier (e.g., two-sum)'}
-                      required
+                      required={!isEditMode}
                     >
                       <Controller
                         name="slug"
                         control={control}
                         rules={{ 
-                          required: 'Slug is required',
+                          required: isEditMode ? false : 'Slug is required',
                           pattern: {
                             value: /^[a-z0-9-]+$/,
                             message: 'Slug must be lowercase letters, numbers, and hyphens only'
@@ -265,12 +406,12 @@ export default function AdminPage() {
                       label="Difficulty"
                       validateStatus={errors.difficulty ? 'error' : ''}
                       help={errors.difficulty?.message}
-                      required
+                      required={!isEditMode}
                     >
                       <Controller
                         name="difficulty"
                         control={control}
-                        rules={{ required: 'Difficulty is required' }}
+                        rules={{ required: isEditMode ? false : 'Difficulty is required' }}
                         render={({ field }) => (
                           <Select
                             {...field}
@@ -290,14 +431,17 @@ export default function AdminPage() {
                       label="Topics"
                       validateStatus={errors.topics ? 'error' : ''}
                       help={errors.topics?.message || 'Press Enter to add each topic'}
-                      required
+                      required={!isEditMode}
                     >
                       <Controller
                         name="topics"
                         control={control}
                         rules={{ 
-                          required: 'At least one topic is required',
-                          validate: (value) => value.length > 0 || 'At least one topic is required'
+                          required: isEditMode ? false : 'At least one topic is required',
+                          validate: (value) => {
+                            if (isEditMode) return true;
+                            return value.length > 0 || 'At least one topic is required';
+                          }
                         }}
                         render={({ field }) => (
                           <Select
@@ -317,13 +461,13 @@ export default function AdminPage() {
                       label="Description"
                       validateStatus={errors.description ? 'error' : ''}
                       help={errors.description?.message || 'Full problem description (supports markdown)'}
-                      required
+                      required={!isEditMode}
                     >
                       <Controller
                         name="description"
                         control={control}
                         rules={{ 
-                          required: 'Description is required',
+                          required: isEditMode ? false : 'Description is required',
                           minLength: {
                             value: 10,
                             message: 'Description must be at least 10 characters'
@@ -440,7 +584,13 @@ export default function AdminPage() {
                     <Button
                       size="large"
                       icon={<CloseOutlined />}
-                      onClick={() => reset()}
+                      onClick={() => {
+                        reset();
+                        setSearchSlug('');
+                        setCurrentQuestionId(null);
+                        setError(null);
+                        setSuccess(null);
+                      }}
                       disabled={loading}
                     >
                       Reset
@@ -451,8 +601,9 @@ export default function AdminPage() {
                       icon={<SaveOutlined />}
                       htmlType="submit"
                       loading={loading}
+                      disabled={isEditMode && !currentQuestionId}
                     >
-                      Create Question
+                      {isEditMode ? 'Update Question' : 'Create Question'}
                     </Button>
                   </Space>
                 </Space>

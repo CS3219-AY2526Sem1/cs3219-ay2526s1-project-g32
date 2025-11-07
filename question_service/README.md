@@ -84,6 +84,7 @@ question_service/
 | `POST /api/v1/questions` | Create a new question (requires title, description, difficulty, topics). |
 | `GET /api/v1/questions` | Get all questions with optional filters (title, difficulty, topic). |
 | `GET /api/v1/questions/random` | Get a random question with optional difficulty/topic filters (used by matching service). |
+| `GET /api/v1/questions/slug/:slug` | Get a specific question by its slug (URL-friendly identifier). |
 | `GET /api/v1/questions/:id` | Get a specific question by ID. |
 | `PUT /api/v1/questions/:id` | Update an existing question (partial updates supported). |
 | `DELETE /api/v1/questions/:id` | Delete a question by ID. |
@@ -112,6 +113,59 @@ All questions return data in the following format:
 ```
 
 > **Note:** The `topic` field (singular) returns the first topic for compatibility with collaboration service, while `topics` contains the full array. Image URLs are embedded in the description field.
+
+### API Usage Examples
+
+#### Get Question by Slug
+```bash
+# Request
+GET /api/v1/questions/slug/two-sum
+
+# Response (200 OK)
+{
+  "id": 1,
+  "title": "Two Sum",
+  "slug": "two-sum",
+  "description": "Given an array of integers...",
+  "difficulty": "Easy",
+  "topics": ["Array", "Hash Table"],
+  "starterCode": { ... }
+}
+
+# Not Found (404)
+{
+  "error": "Question not found"
+}
+```
+
+#### Get Question by ID
+```bash
+# Request
+GET /api/v1/questions/1
+
+# Response (200 OK)
+{
+  "id": 1,
+  "title": "Two Sum",
+  "slug": "two-sum",
+  ...
+}
+```
+
+#### Get Random Question
+```bash
+# Request
+GET /api/v1/questions/random?difficulty=Medium&topic=Array
+
+# Response (200 OK)
+{
+  "id": 42,
+  "title": "Product of Array Except Self",
+  "topic": "Array",
+  "topics": ["Array", "Prefix Sum"],
+  ...
+}
+```
 
 ## Database Schema
 
@@ -224,6 +278,7 @@ The `parseTopics()` helper function automatically detects and parses the format,
 
 ## Recent Updates (November 2025)
 
+- **Added GET by slug endpoint** (`GET /api/v1/questions/slug/:slug`) for retrieving questions by URL-friendly identifiers
 - **Migrated to questionsv3 table** with improved schema design
 - **Added multi-language starter code** support (Python, C, C++, Java, JavaScript)
 - **Added slug field** for URL-friendly question identifiers

@@ -289,6 +289,14 @@ export const getQuestionById = async (id: number) =>
     }),
   );
 
+export const getQuestionBySlug = async (slug: string) =>
+  handleResponse<QuestionResponse>(
+    await fetch(withQuestionUrl(`/slug/${slug}`), {
+      method: 'GET',
+      headers: jsonHeaders,
+    }),
+  );
+
 export const updateQuestion = async (id: number, payload: Partial<CreateQuestionPayload>) =>
   handleResponse<QuestionResponse>(
     await fetch(withQuestionUrl(`/${id}`), {
