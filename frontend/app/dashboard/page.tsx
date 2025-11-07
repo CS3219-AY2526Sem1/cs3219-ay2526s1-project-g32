@@ -3,17 +3,24 @@
 import { useEffect, useState } from "react";
 import type { Route } from "next";
 import { useRouter } from "next/navigation";
-import { Button, Card, Col, ConfigProvider, Layout, Row, Space, Typography } from "antd";
+import { Button, Card, Col, ConfigProvider, Layout, List, Row, Space, Typography } from "antd";
 
 import { useAuth } from "../../hooks/useAuth";
 import { useRequireAuth } from "../../hooks/useRequireAuth";
 import { peerPrepTheme } from "../../lib/theme";
 import { fetchActiveSessionForUser, type ActiveSessionResponse } from "../../lib/collab-client";
+import { fetchUserHistory, fetchSessionAttemptDetail } from "../../lib/api-client";
+import { fetchQuestionById } from "../../lib/question-client";
 
 const { Header, Content } = Layout;
 const { Title, Text } = Typography;
 
 const LANDING_ROUTE = "/" as Route;
+type HistoryListItem = {
+  sessionAttemptId: string;
+  questionTitle: string;
+  endedAt: string | null;
+};
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -23,6 +30,9 @@ export default function DashboardPage() {
   const [activeSession, setActiveSession] = useState<ActiveSessionResponse | null>(null);
   const [checkingActive, setCheckingActive] = useState(false);
   const [activeError, setActiveError] = useState<string | null>(null);
+  const [historyItems, setHistoryItems] = useState<HistoryListItem[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isReady || !user || !session?.accessToken) {
@@ -59,6 +69,120 @@ export default function DashboardPage() {
     };
   }, [isReady, session?.accessToken, user?.id]);
 
+  useEffect(() => {
+    if (!isReady || !isAuthenticated || !session?.accessToken) {
+      setHistoryItems([]);
+      setHistoryLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setHistoryLoading(true);
+    setHistoryError(null);
+
+    const loadHistory = async () => {
+      try {
+        const { attempts } = await fetchUserHistory(session.accessToken);
+        if (cancelled) return;
+
+        if (attempts.length === 0) {
+          setHistoryItems([]);
+          return;
+        }
+
+        const details = await Promise.all(
+          attempts.map(async (attempt) => {
+            try {
+              const { attempt: detail } = await fetchSessionAttemptDetail(
+                attempt.session_attempt_id,
+                session.accessToken,
+              );
+              return {
+                sessionAttemptId: detail.id ?? attempt.session_attempt_id,
+                questionId: detail.question_id ?? null,
+                endedAt: detail.ended_at ?? null,
+              };
+            } catch {
+              return null;
+            }
+          }),
+        );
+
+        if (cancelled) return;
+
+        const validDetails = details.filter(
+          (detail): detail is { sessionAttemptId: string; questionId: number | null; endedAt: string | null } =>
+            Boolean(detail && detail.sessionAttemptId),
+        );
+
+        if (validDetails.length === 0) {
+          setHistoryItems([]);
+          return;
+        }
+
+        const uniqueQuestionIds = Array.from(
+          new Set(
+            validDetails
+              .map((detail) => detail.questionId)
+              .filter((id): id is number => typeof id === "number" && Number.isFinite(id)),
+          ),
+        );
+
+        const questionTitleMap = new Map<number, string>();
+        await Promise.all(
+          uniqueQuestionIds.map(async (questionId) => {
+            try {
+              const question = await fetchQuestionById(questionId);
+              questionTitleMap.set(questionId, question.title);
+            } catch {
+              questionTitleMap.set(questionId, `Question #${questionId}`);
+            }
+          }),
+        );
+
+        if (cancelled) return;
+
+        const toTimestamp = (value: string | null) => {
+          if (!value) return 0;
+          const parsed = Date.parse(value);
+          return Number.isNaN(parsed) ? 0 : parsed;
+        };
+
+        const items = validDetails
+          .map((detail) => ({
+            sessionAttemptId: detail.sessionAttemptId,
+            questionTitle:
+              detail.questionId !== null
+                ? questionTitleMap.get(detail.questionId) ?? `Question #${detail.questionId}`
+                : "Unknown question",
+            endedAt: detail.endedAt,
+          }))
+          .sort((a, b) => toTimestamp(b.endedAt) - toTimestamp(a.endedAt));
+
+        setHistoryItems(items);
+      } catch (error) {
+        if (!cancelled) {
+          setHistoryItems([]);
+          if (error instanceof Error) {
+            setHistoryError(error.message);
+          } else {
+            setHistoryError("Unable to load attempt history");
+          }
+        }
+      } finally {
+        if (!cancelled) {
+          setHistoryLoading(false);
+        }
+      }
+    };
+
+    void loadHistory();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated, isReady, session?.accessToken]);
+
   if (!isReady) {
     return (
       <ConfigProvider theme={peerPrepTheme}>
@@ -83,6 +207,17 @@ export default function DashboardPage() {
     user && typeof user.userMetadata?.username === "string"
       ? (user.userMetadata.username as string)
       : "-";
+
+  const formatAttemptDate = (value: string | null) => {
+    if (!value) {
+      return "In progress";
+    }
+    const parsed = Date.parse(value);
+    if (Number.isNaN(parsed)) {
+      return "In progress";
+    }
+    return new Date(parsed).toLocaleString();
+  };
 
   return (
     <ConfigProvider theme={peerPrepTheme}>
@@ -224,6 +359,52 @@ export default function DashboardPage() {
                   </Card>
                 </Col>
               </Row>
+
+              <Card
+                className="dark-card"
+                title="Attempt history"
+                bordered
+                headStyle={{ padding: "16px 24px" }}
+                bodyStyle={{ padding: 0 }}
+              >
+                {historyLoading ? (
+                  <div style={{ padding: "24px" }}>
+                    <Text style={{ color: "var(--muted)" }}>Loading attempt history...</Text>
+                  </div>
+                ) : historyError ? (
+                  <div style={{ padding: "24px" }}>
+                    <Text style={{ color: "#ff7875" }}>{historyError}</Text>
+                  </div>
+                ) : historyItems.length === 0 ? (
+                  <div style={{ padding: "24px" }}>
+                    <Text style={{ color: "var(--muted)" }}>No past attempts yet.</Text>
+                  </div>
+                ) : (
+                  <div style={{ maxHeight: 320, overflowY: "auto" }}>
+                    <List
+                      dataSource={historyItems}
+                      rowKey="sessionAttemptId"
+                      renderItem={(item) => (
+                        <List.Item
+                          style={{
+                            cursor: "pointer",
+                            padding: "16px 24px",
+                            borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
+                          }}
+                          onClick={() => router.push(`/history/${item.sessionAttemptId}`)}
+                        >
+                          <Space direction="vertical" size={0} style={{ width: "100%" }}>
+                            <Text style={{ color: "#fff", fontWeight: 600 }}>{item.questionTitle}</Text>
+                            <Text style={{ color: "var(--muted)", fontSize: 12 }}>
+                              {formatAttemptDate(item.endedAt)}
+                            </Text>
+                          </Space>
+                        </List.Item>
+                      )}
+                    />
+                  </div>
+                )}
+              </Card>
             </Space>
           </div>
         </Content>

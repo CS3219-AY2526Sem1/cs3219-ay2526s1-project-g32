@@ -65,6 +65,28 @@ export type MeResponse = {
   user: PublicUser | null;
 };
 
+export type UserAttemptRecord = {
+  user_id: string;
+  session_attempt_id: string;
+};
+
+export type HistoryListResponse = {
+  attempts: UserAttemptRecord[];
+};
+
+export type SessionAttemptRecord = {
+  id: string;
+  match_id: string | null;
+  question_id: number | null;
+  started_at: string | null;
+  ended_at: string | null;
+  participants?: Record<string, unknown> | null;
+};
+
+export type SessionAttemptDetailResponse = {
+  attempt: SessionAttemptRecord;
+};
+
 const withBaseUrl = (path: string) => `${API_BASE_URL}${path}`;
 
 export const register = async (payload: RegisterPayload) =>
@@ -103,6 +125,26 @@ export const resendMagicLink = async (payload: SendMagicLinkPayload) =>
 export const fetchMe = async (accessToken: string) =>
   handleResponse<MeResponse>(
     await fetch(withBaseUrl('/auth/me'), {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    }),
+  );
+
+export const fetchUserHistory = async (accessToken: string) =>
+  handleResponse<HistoryListResponse>(
+    await fetch(withBaseUrl('/history'), {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    }),
+  );
+
+export const fetchSessionAttemptDetail = async (sessionAttemptId: string, accessToken: string) =>
+  handleResponse<SessionAttemptDetailResponse>(
+    await fetch(withBaseUrl(`/history/${sessionAttemptId}`), {
       method: 'GET',
       headers: {
         Authorization: `Bearer ${accessToken}`,
