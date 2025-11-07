@@ -41,6 +41,9 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
   });
 });
 
+let server: import("http").Server | null = null;
+let shuttingDown = false;
+
 const startServer = async (): Promise<void> => {
   try {
     logger.info("Starting Question Service...");
@@ -54,8 +57,8 @@ const startServer = async (): Promise<void> => {
     }
     
     logger.info("Connected to Supabase successfully");
-    
-    app.listen(config.http.port, () => {
+
+    server = app.listen(config.http.port, () => {
       logger.info(`Question Service running on port ${config.http.port}`);
     });
   } catch (error) {
@@ -65,3 +68,28 @@ const startServer = async (): Promise<void> => {
 };
 
 startServer();
+
+const gracefulShutdown = (signal: string) => {
+  if (shuttingDown) {
+    return;
+  }
+
+  shuttingDown = true;
+  logger.info({ signal }, "Received shutdown signal, closing Question Service");
+
+  if (server) {
+    server.close((closeErr) => {
+      if (closeErr) {
+        logger.error({ err: closeErr }, "Error while closing HTTP server");
+        process.exit(1);
+      }
+      logger.info("Question Service terminated gracefully");
+      process.exit(0);
+    });
+  } else {
+    process.exit(0);
+  }
+};
+
+process.on("SIGINT", () => gracefulShutdown("SIGINT"));
+process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));

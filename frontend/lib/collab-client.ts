@@ -15,6 +15,11 @@ export type QuestionSnapshot = {
   };
 };
 
+export type SessionDocuments = {
+  state: string;
+  languages: Record<string, string>;
+};
+
 export type SessionSnapshot = {
   sessionId: string;
   matchId: string;
@@ -22,6 +27,7 @@ export type SessionSnapshot = {
   difficulty: 'easy' | 'medium' | 'hard';
   status: 'pending' | 'active' | 'ended';
   question: QuestionSnapshot;
+  documents: SessionDocuments;
   participants: SessionParticipant[];
   createdAt?: string;
   updatedAt?: string;
@@ -61,3 +67,30 @@ export const requestSessionToken = async (sessionId: string, payload: { userId: 
       body: JSON.stringify(payload),
     }),
   );
+
+export type ActiveSessionResponse = {
+  sessionId: string;
+  expiresAt: string;
+  question: {
+    id: string;
+    title: string;
+  };
+};
+
+export const fetchActiveSessionForUser = async (
+  payload: { userId: string; accessToken: string },
+): Promise<ActiveSessionResponse | null> => {
+  const response = await fetch(toUrl('/sessions/active'), {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (response.status === 404) {
+    return null;
+  }
+
+  return handleResponse<ActiveSessionResponse>(response);
+};

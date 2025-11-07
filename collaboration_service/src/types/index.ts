@@ -8,6 +8,7 @@ export type {
   SessionCreateResponse,
   SessionEvent,
   SessionParticipantState,
+  SessionDocuments,
   SessionSnapshot,
   SessionStatus,
   SessionTokenRequest,

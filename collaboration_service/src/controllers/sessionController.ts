@@ -1,13 +1,24 @@
 import type { Request, Response, NextFunction } from 'express';
 
 import {
+  SessionActiveRequestSchema,
   SessionCreateResponseSchema,
   SessionCreateSchema,
   SessionIdParamsSchema,
   SessionTokenRequestSchema,
 } from '../schemas';
 import type { SessionManager } from '../services/sessionManager';
-import { diff } from 'util';
+
+type QuestionServiceResponse = {
+  id: number;
+  title: string;
+  slug?: string;
+  description: string;
+  difficulty?: string;
+  topic?: string;
+  topics?: string[];
+  starterCode?: Record<string, string | null | undefined>;
+};
 
 export class SessionController {
   constructor(
@@ -24,25 +35,25 @@ export class SessionController {
       const question = await this.fetchQuestion(payload.topic, payload.difficulty);
       const session = await this.sessionManager.createSession(payload, question);
 
-      const response = SessionCreateResponseSchema.parse({
-        sessionId: session.sessionId,
-        question: session.question,
-        expiresAt: session.expiresAt,
-      });
-
-      res.status(201).json(response);
+      res.status(201).json(
+        SessionCreateResponseSchema.parse({
+          sessionId: session.sessionId,
+          expiresAt: session.expiresAt,
+        }),
+      );
     } catch (error) {
       next(error);
     }
   };
 
   private async fetchQuestion(topic: string, difficulty: string) {
-    const url = new URL('questions/random', this.questionServiceBaseUrl);
-    difficulty = difficulty.charAt(0).toUpperCase() + difficulty.slice(1);
-    url.searchParams.set('topic', topic);
-    url.searchParams.set('difficulty', difficulty);
+    const normalizedDifficultyParam = `${difficulty.charAt(0).toUpperCase()}${difficulty.slice(1)}`;
 
-    const response = await fetch(url, {
+    const url = new URL('questions/random', this.ensureTrailingSlash(this.questionServiceBaseUrl));
+    url.searchParams.set('topic', topic);
+    url.searchParams.set('difficulty', normalizedDifficultyParam);
+
+    const response = await fetch(url.toString(), {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -53,29 +64,42 @@ export class SessionController {
       throw new Error(`Question service responded with status ${response.status}`);
     }
 
-    const data = (await response.json()) as {
-      id: number;
-      title: string;
-      description: string;
-      difficulty: string;
-      topics?: string[];
-    };
+    const data = (await response.json()) as QuestionServiceResponse;
 
-    const normalizedDifficulty = (data.difficulty ?? difficulty).toString().toLowerCase() as
-      | 'easy'
-      | 'medium'
-      | 'hard';
+    const lowerDifficulty = (data.difficulty ?? normalizedDifficultyParam).toLowerCase();
+    const normalizedDifficulty = ['easy', 'medium', 'hard'].includes(lowerDifficulty)
+      ? (lowerDifficulty as 'easy' | 'medium' | 'hard')
+      : (difficulty as 'easy' | 'medium' | 'hard');
+
+    const topics =
+      Array.isArray(data.topics) && data.topics.length > 0
+        ? data.topics
+        : data.topic
+        ? [data.topic]
+        : [];
+
+    const starterCodeEntries = Object.entries(data.starterCode ?? {}).filter(
+      ([, value]) => typeof value === 'string' && value.trim().length > 0,
+    );
+    const starterCode = starterCodeEntries.reduce<Record<string, string>>((acc, [key, value]) => {
+      acc[key] = value as string;
+      return acc;
+    }, {});
 
     return {
       questionId: String(data.id),
       title: data.title,
       prompt: data.description,
-      starterCode: {},
+      starterCode,
       metadata: {
         difficulty: normalizedDifficulty,
-        topics: data.topics ?? [],
+        topics,
       },
     };
+  }
+
+  private ensureTrailingSlash(baseUrl: string): string {
+    return baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
   }
 
   getSession = async (req: Request, res: Response, next: NextFunction) => {
@@ -113,6 +137,35 @@ export class SessionController {
         wsUrl: this.websocketBaseUrl,
         sessionToken: token,
         expiresIn,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  getActiveSessionForUser = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const body = SessionActiveRequestSchema.parse(req.body);
+
+      const isValid = await this.validateAccessToken(body.accessToken, body.userId);
+      if (!isValid) {
+        res.status(403).json({ error: 'Forbidden', message: 'User is inactive' });
+        return;
+      }
+
+      const session = await this.sessionManager.getActiveSessionForUser(body.userId);
+      if (!session) {
+        res.status(404).json({ error: 'NotFoundError', message: 'No active session' });
+        return;
+      }
+
+      res.json({
+        sessionId: session.sessionId,
+        expiresAt: session.expiresAt,
+        question: {
+          id: session.question.questionId,
+          title: session.question.title,
+        },
       });
     } catch (error) {
       next(error);

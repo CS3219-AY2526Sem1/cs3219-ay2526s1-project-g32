@@ -21,6 +21,12 @@ export const QuestionSnapshotSchema = z.object({
 });
 export type QuestionSnapshot = z.infer<typeof QuestionSnapshotSchema>;
 
+export const SessionDocumentsSchema = z.object({
+  state: z.string().min(1),
+  languages: z.record(z.string(), z.string()),
+});
+export type SessionDocuments = z.infer<typeof SessionDocumentsSchema>;
+
 export const ParticipantBaseSchema = z.object({
   userId: z.string().min(1),
   displayName: z.string().optional(),
@@ -52,6 +58,7 @@ export const SessionSnapshotSchema = z.object({
   difficulty: DifficultySchema,
   status: SessionStatusSchema,
   question: QuestionSnapshotSchema,
+  documents: SessionDocumentsSchema,
   participants: z.array(SessionParticipantStateSchema).length(2),
   createdAt: z.string().datetime().optional(),
   updatedAt: z.string().datetime().optional(),
@@ -62,7 +69,6 @@ export type SessionSnapshot = z.infer<typeof SessionSnapshotSchema>;
 
 export const SessionCreateResponseSchema = z.object({
   sessionId: z.string().uuid(),
-  question: QuestionSnapshotSchema,
   expiresAt: z.string().datetime(),
 });
 export type SessionCreateResponse = z.infer<typeof SessionCreateResponseSchema>;
@@ -72,6 +78,12 @@ export const SessionTokenRequestSchema = z.object({
   accessToken: z.string().min(1),
 });
 export type SessionTokenRequest = z.infer<typeof SessionTokenRequestSchema>;
+
+export const SessionActiveRequestSchema = z.object({
+  userId: z.string().min(1),
+  accessToken: z.string().min(1),
+});
+export type SessionActiveRequest = z.infer<typeof SessionActiveRequestSchema>;
 
 export const SessionTokenResponseSchema = z.object({
   wsUrl: z.string().url(),

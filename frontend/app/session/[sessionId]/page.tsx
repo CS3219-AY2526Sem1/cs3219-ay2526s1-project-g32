@@ -1,17 +1,15 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Monaco } from '@monaco-editor/react';
 import { MonacoBinding } from 'y-monaco';
 import { WebsocketProvider } from 'y-websocket';
 import * as Y from 'yjs';
 import type { editor as MonacoEditorNS } from 'monaco-editor';
-import 'monaco-editor/esm/vs/basic-languages/python/python.contribution';
-import 'monaco-editor/esm/vs/basic-languages/java/java.contribution';
-import 'monaco-editor/esm/vs/basic-languages/cpp/cpp.contribution';
 import ReactMarkdown from 'react-markdown';
+import type { Components } from 'react-markdown';
 import {
   Avatar,
   Badge,
@@ -39,32 +37,31 @@ const { Title, Text, Paragraph } = Typography;
 
 const MonacoEditor = dynamic(() => import('@monaco-editor/react'), { ssr: false });
 
-const LANGUAGE_OPTIONS = [
-  { label: 'JavaScript', value: 'javascript' },
-  { label: 'Python', value: 'python' },
-  { label: 'Java', value: 'java' },
-  { label: 'C', value: 'c' },
-  { label: 'C++', value: 'cpp' },
-];
-
-const SUPPORTED_LANGUAGES = new Set(LANGUAGE_OPTIONS.map((option) => option.value));
-
-const NORMALIZE_LANGUAGE_MAP: Record<string, string> = {
-  typescript: 'javascript',
-  'c++': 'cpp',
+type LanguageOption = {
+  label: string;
+  value: string;
 };
 
-const normalizeLanguage = (language?: string | null): string => {
-  if (!language) {
-    return 'javascript';
-  }
-  const normalized = language.toLowerCase();
-  const mapped = NORMALIZE_LANGUAGE_MAP[normalized] ?? normalized;
-  return SUPPORTED_LANGUAGES.has(mapped) ? mapped : 'javascript';
+type LanguageDocEntry = {
+  doc: Y.Doc;
+  provider: WebsocketProvider;
+  text: Y.Text;
+  dispose: () => void;
 };
 
-const resolveMonacoLanguage = (language: string): string => (language === 'c' ? 'cpp' : language);
+const LANGUAGE_LABELS: Record<string, string> = {
+  javascript: 'JavaScript',
+  python: 'Python',
+  java: 'Java',
+  c: 'C',
+  cpp: 'C++',
+};
 
+const DEFAULT_LANGUAGES = Object.keys(LANGUAGE_LABELS);
+
+const normalizeLanguage = (language?: string | null) => (language ? language.toLowerCase() : 'javascript');
+const resolveMonacoLanguage = (language: string) => (language === 'c' ? 'cpp' : language);
+const labelForLanguage = (language: string) => LANGUAGE_LABELS[language] ?? language.toUpperCase();
 const difficultyColor: Record<'easy' | 'medium' | 'hard', string> = {
   easy: 'green',
   medium: 'gold',
@@ -72,6 +69,16 @@ const difficultyColor: Record<'easy' | 'medium' | 'hard', string> = {
 };
 
 const wsBaseUrl = (process.env.NEXT_PUBLIC_COLLAB_WS_URL ?? 'ws://localhost:4010/collab').replace(/\/$/, '');
+
+const markdownComponents: Components = {
+  img: ({ alt, src }) => (
+    <img
+      alt={alt ?? ''}
+      src={src ?? ''}
+      style={{ maxWidth: '100%', height: 'auto', display: 'block', margin: '0 auto' }}
+    />
+  ),
+};
 
 export default function SessionPage({ params }: { params: { sessionId: string } }) {
   const { user, session: authSession, isAuthenticated, isReady: authReady } = useAuth();
@@ -85,326 +92,136 @@ export default function SessionPage({ params }: { params: { sessionId: string } 
   const [currentLanguage, setCurrentLanguage] = useState<string>('javascript');
   const [presenceMap, setPresenceMap] = useState<Record<string, { name: string; connected: boolean }>>({});
 
-  const ydoc = useMemo(() => new Y.Doc(), [params.sessionId]);
-  const yText = useMemo(() => ydoc.getText('monaco'), [ydoc]);
-  const settingsMap = useMemo(() => ydoc.getMap('settings'), [ydoc]);
-
+  const sessionSnapshotRef = useRef<SessionSnapshot | null>(null);
+  const sessionTokenRef = useRef<string | null>(null);
+  const stateDocRef = useRef<Y.Doc | null>(null);
+  const stateProviderRef = useRef<WebsocketProvider | null>(null);
+  const stateProviderCleanupRef = useRef<(() => void) | null>(null);
+  const bindingRef = useRef<MonacoBinding | null>(null);
   const editorRef = useRef<MonacoEditorNS.IStandaloneCodeEditor | null>(null);
   const monacoRef = useRef<Monaco | null>(null);
-  const bindingRef = useRef<MonacoBinding | null>(null);
-  const providerRef = useRef<WebsocketProvider | null>(null);
-  const initializedRef = useRef(false);
+  const currentLanguageRef = useRef<string>('javascript');
 
-  const localDisplayName = useMemo(() => {
-    if (!user) return undefined;
-    if (typeof user.userMetadata?.username === 'string') {
-      return user.userMetadata.username as string;
-    }
-    return user.email ?? user.id;
-  }, [user]);
-
-  const sessionUrl = useMemo(() => {
-    if (typeof window !== 'undefined' && window.location) {
-      return window.location.href;
-    }
-    const base = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '') ?? '';
-    return base ? `${base}/session/${params.sessionId}` : `/session/${params.sessionId}`;
-  }, [params.sessionId]);
-
-  useEffect(() => () => ydoc.destroy(), [ydoc]);
+  const languageEntriesRef = useRef<Record<string, LanguageDocEntry>>({});
+  const languageModelsRef = useRef<Record<string, MonacoEditorNS.ITextModel>>({});
+  const pendingLanguageRef = useRef<string | null>(null);
+  const basePresenceRef = useRef<Record<string, { name: string; connected: boolean }>>({});
+  const pendingBindLanguageRef = useRef<string | null>(null);
 
   useEffect(() => {
-    initializedRef.current = false;
-  }, [params.sessionId]);
-
-  useEffect(() => {
-    if (!sessionSnapshot) {
+    if (typeof window === 'undefined') {
       return;
     }
 
-    setPresenceMap((prev) => {
-      const next: Record<string, { name: string; connected: boolean }> = { ...prev };
-      sessionSnapshot.participants.forEach((participant) => {
-        const userId = participant.userId;
-        const fallbackName =
-          prev[userId]?.name ??
-          participant.displayName ??
-          (userId === user?.id && localDisplayName ? localDisplayName : userId);
+    const loadMonacoContributions = async () => {
+      await Promise.all([
+        import('monaco-editor/esm/vs/basic-languages/python/python.contribution'),
+        import('monaco-editor/esm/vs/basic-languages/java/java.contribution'),
+        import('monaco-editor/esm/vs/basic-languages/cpp/cpp.contribution'),
+      ]);
+    };
 
-        next[userId] = {
-          name: fallbackName,
-          connected: prev[userId]?.connected ?? false,
-        };
-      });
-
-      Object.keys(next).forEach((userId) => {
-        if (!sessionSnapshot.participants.some((participant) => participant.userId === userId)) {
-          delete next[userId];
-        }
-      });
-
-      return next;
+    loadMonacoContributions().catch((error) => {
+      console.error('Failed to load Monaco language contributions', error);
     });
-  }, [sessionSnapshot, user?.id, localDisplayName]);
+  }, []);
 
   useEffect(() => {
-    const observer = () => {
-      const value = settingsMap.get('language');
-      const normalized = normalizeLanguage(typeof value === 'string' ? value : undefined);
-
-      if (typeof value === 'string' && normalized !== value) {
-        settingsMap.set('language', normalized);
-      }
-      setCurrentLanguage(normalized);
-    };
-
-    observer();
-    settingsMap.observe(observer);
-    return () => settingsMap.unobserve(observer);
-  }, [settingsMap]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const bootstrap = async () => {
-      if (!authReady || !isAuthenticated || !authSession?.accessToken || !user?.id) {
-        return;
-      }
-
-      setLoading(true);
-      setError(null);
-
-      try {
-        const session = await fetchSession(params.sessionId);
-        if (cancelled) return;
-        setSessionSnapshot(session);
-
-        const defaultLanguage = normalizeLanguage(Object.keys(session.question.starterCode ?? {}).find(Boolean));
-        if (!settingsMap.has('language')) {
-          settingsMap.set('language', defaultLanguage);
-        } else {
-          const existing = settingsMap.get('language');
-          if (typeof existing === 'string') {
-            const normalizedExisting = normalizeLanguage(existing);
-            if (normalizedExisting !== existing) {
-              settingsMap.set('language', normalizedExisting);
-            }
-          }
-        }
-
-        const { sessionToken: token } = await requestSessionToken(params.sessionId, {
-          userId: user.id,
-          accessToken: authSession.accessToken,
-        });
-
-        if (cancelled) return;
-        setSessionToken(token);
-      } catch (err) {
-        if (!cancelled) {
-          setError(err instanceof Error ? err.message : 'Failed to load session');
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      }
-    };
-
-    void bootstrap();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    authReady,
-    isAuthenticated,
-    authSession?.accessToken,
-    params.sessionId,
-    settingsMap,
-    user?.id,
-  ]);
-
-  useEffect(() => {
-    if (!sessionSnapshot || !sessionToken || !user) {
-      return;
-    }
-
-    const provider = new WebsocketProvider(wsBaseUrl, sessionSnapshot.sessionId, ydoc, {
-      params: {
-        token: sessionToken,
-      },
-    });
-
-    providerRef.current = provider;
-    setConnectionStatus(provider.wsconnected ? 'connected' : 'connecting');
-
-    const participantRecord = sessionSnapshot.participants.find((participant) => participant.userId === user.id);
-    const resolvedDisplayName =
-      participantRecord?.displayName ?? localDisplayName ?? participantRecord?.userId ?? user.id;
-
-    const applyLocalState = (languageValue: string) => {
-      const existingState = provider.awareness.getLocalState() ?? {};
-      provider.awareness.setLocalState({
-        ...existingState,
-        participant: { userId: user.id, name: resolvedDisplayName },
-        editor: { language: languageValue },
-      });
-    };
-
-    applyLocalState(currentLanguage);
-
-    const handleStatus = (event: { status: 'connected' | 'connecting' | 'disconnected' }) => {
-      setConnectionStatus(event.status);
-    };
-
-    const updatePresence = () => {
-      const states = provider.awareness.getStates();
-      const connectedIds = new Set<string>();
-      const namesFromPresence = new Map<string, string>();
-
-      states.forEach((state) => {
-        const participantState = state?.participant as { userId?: string; name?: string } | undefined;
-        if (participantState?.userId) {
-          connectedIds.add(participantState.userId);
-          if (typeof participantState.name === 'string' && participantState.name.trim()) {
-            namesFromPresence.set(participantState.userId, participantState.name);
-          }
-        }
-      });
-
-      setPresenceMap((prev) => {
-        const next: Record<string, { name: string; connected: boolean }> = { ...prev };
-
-        if (sessionSnapshot) {
-          sessionSnapshot.participants.forEach((participant) => {
-            const userId = participant.userId;
-            const presenceName = namesFromPresence.get(userId);
-            const previousName = prev[userId]?.name;
-            const fallbackName =
-              presenceName ??
-              previousName ??
-              participant.displayName ??
-              (userId === user.id && resolvedDisplayName ? resolvedDisplayName : userId);
-
-            next[userId] = {
-              name: fallbackName,
-              connected: connectedIds.has(userId),
-            };
-          });
-        }
-
-        Object.keys(next).forEach((userId) => {
-          if (!sessionSnapshot?.participants.some((participant) => participant.userId === userId)) {
-            delete next[userId];
-          } else if (!connectedIds.has(userId)) {
-            next[userId] = {
-              ...next[userId],
-              connected: false,
-            };
-          }
-        });
-
-        return next;
-      });
-    };
-
-    provider.on('status', handleStatus);
-      provider.awareness.on('update', updatePresence);
-      updatePresence();
-
-      return () => {
-        provider.off('status', handleStatus);
-        provider.awareness.off('update', updatePresence);
-        provider.destroy();
-        providerRef.current = null;
-        setPresenceMap({});
-        setConnectionStatus('disconnected');
-      };
-  }, [sessionSnapshot, sessionToken, user, ydoc, localDisplayName]);
-
-  useEffect(() => {
-    const editor = editorRef.current;
-    const provider = providerRef.current;
-
-    if (!sessionSnapshot || !editor || !provider) {
-      return;
-    }
-
-    const model = editor.getModel();
-    if (!model) {
-      return;
-    }
-
-    bindingRef.current?.destroy();
-    bindingRef.current = new MonacoBinding(yText, model, new Set([editor]), provider.awareness);
-
     return () => {
       bindingRef.current?.destroy();
       bindingRef.current = null;
+      if (stateProviderCleanupRef.current) {
+        stateProviderCleanupRef.current();
+        stateProviderCleanupRef.current = null;
+      }
+      Object.values(languageEntriesRef.current).forEach((entry) => {
+        entry.dispose();
+      });
+      languageEntriesRef.current = {};
+      stateProviderRef.current?.destroy();
+      stateDocRef.current?.destroy();
     };
-  }, [sessionSnapshot, sessionToken, yText]);
+  }, []);
 
   useEffect(() => {
-    const provider = providerRef.current;
-    if (!provider) {
-      return;
-    }
-
-    const existingState = provider.awareness.getLocalState() ?? {};
-    provider.awareness.setLocalState({
-      ...existingState,
-      editor: { language: currentLanguage },
-    });
+    currentLanguageRef.current = currentLanguage;
   }, [currentLanguage]);
 
   useEffect(() => {
-    if (!sessionSnapshot) {
-      return;
+    const previousSnapshot = sessionSnapshotRef.current;
+    sessionSnapshotRef.current = sessionSnapshot;
+    if (!sessionSnapshot || (previousSnapshot && previousSnapshot.sessionId !== sessionSnapshot.sessionId)) {
+      Object.values(languageEntriesRef.current).forEach((entry) => entry.dispose());
+      languageEntriesRef.current = {};
     }
-
-    const initialCode =
-      sessionSnapshot.question.starterCode?.[currentLanguage] ??
-      sessionSnapshot.question.starterCode?.[resolveMonacoLanguage(currentLanguage)];
-
-    if (!initializedRef.current && typeof initialCode === 'string' && yText.length === 0) {
-      yText.insert(0, initialCode);
-      initializedRef.current = true;
+    if (sessionSnapshot) {
+      const base: Record<string, { name: string; connected: boolean }> = {};
+      sessionSnapshot.participants.forEach((participant) => {
+        base[participant.userId] = {
+          name: participant.displayName ?? participant.userId,
+          connected: false,
+        };
+      });
+      basePresenceRef.current = base;
+      setPresenceMap(base);
     }
-  }, [currentLanguage, sessionSnapshot, yText]);
-
-  const handleEditorMount = (editor: MonacoEditorNS.IStandaloneCodeEditor, monaco: Monaco) => {
-    editorRef.current = editor;
-    monacoRef.current = monaco;
-
-    setTimeout(() => editor.layout(), 0);
-    const model = editor.getModel();
-    if (!model) {
-      return;
-    }
-
-    monaco.editor.setModelLanguage(model, resolveMonacoLanguage(currentLanguage));
-
-    const provider = providerRef.current;
-    if (provider) {
-      bindingRef.current?.destroy();
-      bindingRef.current = new MonacoBinding(yText, model, new Set([editor]), provider.awareness);
-    }
-  };
+  }, [sessionSnapshot]);
 
   useEffect(() => {
-    const editor = editorRef.current;
-    const monaco = monacoRef.current;
-    if (!editor || !monaco) {
-      return;
-    }
+    sessionTokenRef.current = sessionToken;
+  }, [sessionToken]);
 
-    const model = editor.getModel();
-    if (model) {
-      monaco.editor.setModelLanguage(model, resolveMonacoLanguage(currentLanguage));
+  const resolvedDisplayName = useMemo(() => {
+    if (!user) return undefined;
+    const participantName =
+      sessionSnapshot?.participants.find((participant) => participant.userId === user.id)?.displayName ?? null;
+    if (typeof participantName === 'string' && participantName.trim().length > 0) {
+      return participantName;
     }
-  }, [currentLanguage]);
+    const usernameMetadata =
+      typeof user.userMetadata?.username === 'string' && (user.userMetadata.username as string).trim().length > 0
+        ? (user.userMetadata.username as string)
+        : undefined;
+    return usernameMetadata ?? user.email ?? user.id;
+  }, [sessionSnapshot, user]);
 
-  const handleLeaveSession = () => {
+  const sessionPath = useMemo(() => `/session/${params.sessionId}`, [params.sessionId]);
+  const sessionUrl = useMemo(() => {
+    if (typeof window !== 'undefined' && window.location) {
+      const origin = window.location.origin.replace(/\/$/, '');
+      return `${origin}${sessionPath}`;
+    }
+    const base = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '') ?? '';
+    return base ? `${base}${sessionPath}` : sessionPath;
+  }, [sessionPath]);
+
+  const availableLanguages = useMemo(() => {
+    const docs = sessionSnapshot?.documents.languages ?? {};
+    const keys = Object.keys(docs);
+    if (keys.length === 0) {
+      return DEFAULT_LANGUAGES;
+    }
+    return Array.from(new Set(keys.map((language) => normalizeLanguage(language))));
+  }, [sessionSnapshot]);
+
+  const defaultLanguage = useMemo(() => availableLanguages[0] ?? 'javascript', [availableLanguages]);
+
+  const languageOptions = useMemo<LanguageOption[]>(() => {
+    const order = new Map(DEFAULT_LANGUAGES.map((language, index) => [language, index]));
+    return availableLanguages
+      .slice()
+      .sort((a, b) => {
+        const indexA = order.has(a) ? (order.get(a) as number) : Number.MAX_SAFE_INTEGER;
+        const indexB = order.has(b) ? (order.get(b) as number) : Number.MAX_SAFE_INTEGER;
+        return indexA - indexB;
+      })
+      .map((language) => ({
+        label: labelForLanguage(language),
+        value: language,
+      }));
+  }, [availableLanguages]);
+
+  const handleLeaveSession = useCallback(() => {
     Modal.confirm({
       title: 'Leave session?',
       icon: <ExclamationCircleOutlined />,
@@ -425,43 +242,364 @@ export default function SessionPage({ params }: { params: { sessionId: string } 
         router.push('/dashboard');
       },
     });
-  };
+  }, [router, sessionUrl]);
 
-  const participantBanner = useMemo(() => {
-    if (!sessionSnapshot) return null;
+  const updatePresenceForLanguage = useCallback(
+    (language: string) => {
+      if (currentLanguageRef.current !== language) {
+        return;
+      }
+      const basePresence = basePresenceRef.current;
+      const entry = languageEntriesRef.current[language];
+      if (!entry) {
+        setPresenceMap(basePresence);
+        return;
+      }
+      const next: Record<string, { name: string; connected: boolean }> = { ...basePresence };
+      entry.provider.awareness.getStates().forEach((state) => {
+        const participant = state?.participant as { userId?: string; name?: string } | undefined;
+        if (participant?.userId) {
+          next[participant.userId] = {
+            name: participant.name ?? participant.userId,
+            connected: true,
+          };
+        }
+      });
+      setPresenceMap(next);
+    },
+    [setPresenceMap],
+  );
 
-    return (
-      <Space size="large" align="center" wrap>
-        {sessionSnapshot.participants.map((participant) => {
-          const presence = presenceMap[participant.userId];
-          const connected = presence?.connected ?? false;
-          const displayName =
-            presence?.name ??
-            participant.displayName ??
-            (participant.userId === user?.id && localDisplayName ? localDisplayName : participant.userId);
+  const bindEditorToLanguage = useCallback(
+    (language: string) => {
+      const normalized = normalizeLanguage(language);
+      const editor = editorRef.current;
+      const monaco = monacoRef.current;
+      const entry = languageEntriesRef.current[normalized];
 
-          return (
-            <Badge
-              key={participant.userId}
-              status={connected ? 'success' : 'default'}
-              text={
-                <Space size="small">
-                  <Avatar size="small" icon={<UserOutlined />} />
-                  <Text>{displayName}</Text>
-                </Space>
-              }
-            />
-          );
-        })}
-      </Space>
-    );
-  }, [presenceMap, sessionSnapshot, user?.id, localDisplayName]);
+      if (!entry || !editor || !monaco) {
+        pendingBindLanguageRef.current = normalized;
+        return false;
+      }
+
+    pendingBindLanguageRef.current = null;
+
+    let model = languageModelsRef.current[normalized];
+    if (!model) {
+        model = monaco.editor.createModel('', resolveMonacoLanguage(normalized));
+        languageModelsRef.current[normalized] = model;
+      }
+
+      if (editor.getModel() !== model) {
+      editor.setModel(model);
+    }
+
+    bindingRef.current?.destroy();
+    bindingRef.current = new MonacoBinding(entry.text, model, new Set([editor]), entry.provider.awareness);
+    const providerState =
+      (entry.provider as unknown as { synced?: boolean }).synced === true || entry.provider.wsconnected
+        ? 'connected'
+        : 'connecting';
+    setConnectionStatus(providerState);
+    updatePresenceForLanguage(normalized);
+    return true;
+  },
+  [updatePresenceForLanguage],
+);
+
+  const ensureLanguageEntry = useCallback(
+    (language: string): LanguageDocEntry | null => {
+      const normalized = normalizeLanguage(language);
+      const existing = languageEntriesRef.current[normalized];
+      if (existing) {
+        if (currentLanguageRef.current === normalized) {
+          const bound = bindEditorToLanguage(normalized);
+          if (!bound) {
+            setConnectionStatus(existing.provider.wsconnected ? 'connected' : 'connecting');
+          }
+          updatePresenceForLanguage(normalized);
+        }
+        return existing;
+      }
+
+      const snapshot = sessionSnapshotRef.current;
+      const token = sessionTokenRef.current;
+      if (!snapshot || !token) {
+        return null;
+      }
+
+      const docKey =
+        snapshot.documents.languages[normalized] ??
+        snapshot.documents.languages[language] ??
+        snapshot.documents.languages[normalizeLanguage(normalized)];
+      if (!docKey) {
+        console.warn('No document ID available for language', language);
+        return null;
+      }
+
+      const docPath = `${snapshot.sessionId}/${docKey}`;
+      const doc = new Y.Doc();
+      const provider = new WebsocketProvider(wsBaseUrl, docPath, doc, {
+        params: { token },
+      });
+      const text = doc.getText('monaco');
+
+      const entry: LanguageDocEntry = {
+        doc,
+        provider,
+        text,
+        dispose: () => undefined,
+      };
+
+      const participantRecord = snapshot.participants.find((participant) => participant.userId === user?.id);
+      const participantDisplayName =
+        (participantRecord?.displayName && participantRecord.displayName.trim().length > 0
+          ? participantRecord.displayName
+          : resolvedDisplayName) ?? participantRecord?.userId ?? user?.id ?? 'Anonymous';
+
+      provider.awareness.setLocalState({
+        participant: { userId: user?.id ?? 'anonymous', name: participantDisplayName },
+        editor: { language: normalized },
+      });
+
+      const handleStatus = ({ status }: { status: 'connected' | 'connecting' | 'disconnected' }) => {
+        if (currentLanguageRef.current === normalized) {
+          setConnectionStatus(status);
+        }
+      };
+
+      const handlePresenceUpdate = () => {
+        updatePresenceForLanguage(normalized);
+      };
+
+      const handleSync = (isSynced: boolean) => {
+        if (currentLanguageRef.current === normalized) {
+          setConnectionStatus(isSynced ? 'connected' : 'connecting');
+        }
+        if (!isSynced) {
+          return;
+        }
+        bindEditorToLanguage(normalized);
+        handlePresenceUpdate();
+      };
+
+      provider.awareness.on('update', handlePresenceUpdate);
+      provider.on('status', handleStatus);
+      provider.on('sync', handleSync);
+
+      entry.dispose = () => {
+        provider.awareness.off('update', handlePresenceUpdate);
+        provider.off('status', handleStatus);
+        provider.off('sync', handleSync);
+        provider.destroy();
+        doc.destroy();
+      };
+
+      languageEntriesRef.current[normalized] = entry;
+
+      if (currentLanguageRef.current === normalized) {
+        const bound = bindEditorToLanguage(normalized);
+        if (!bound) {
+          setConnectionStatus(provider.wsconnected ? 'connected' : 'connecting');
+        }
+        handlePresenceUpdate();
+      }
+
+      if (currentLanguageRef.current === normalized && provider.wsconnected) {
+        setConnectionStatus('connected');
+      }
+
+      return entry;
+    },
+    [bindEditorToLanguage, resolvedDisplayName, updatePresenceForLanguage, user],
+  );
+
+  const applyLanguageSwitch = useCallback(
+    (language: string, options: { force?: boolean } = {}) => {
+      const normalized = normalizeLanguage(language);
+      if (!options.force && normalized === currentLanguageRef.current) {
+        return;
+      }
+      currentLanguageRef.current = normalized;
+      setCurrentLanguage(normalized);
+      const entry = ensureLanguageEntry(normalized);
+      if (!entry) {
+        setConnectionStatus('connecting');
+      }
+    },
+    [ensureLanguageEntry],
+  );
+
+  const handleLanguageChange = useCallback(
+    (value: string) => {
+      const normalized = normalizeLanguage(value);
+      pendingLanguageRef.current = normalized;
+      const settings = stateDocRef.current?.getMap('settings');
+      if (settings) {
+        const current = settings.get('language');
+        if (current !== normalized) {
+          stateDocRef.current!.transact(() => {
+            settings.set('language', normalized);
+          });
+        } else {
+          pendingLanguageRef.current = null;
+          applyLanguageSwitch(normalized, { force: true });
+        }
+      } else {
+        applyLanguageSwitch(normalized, { force: true });
+      }
+    },
+    [applyLanguageSwitch],
+  );
+
+  useEffect(() => {
+    if (!authReady || !isAuthenticated || !authSession?.accessToken || !user?.id) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const bootstrap = async () => {
+      setLoading(true);
+      setError(null);
+
+      try {
+        const session = await fetchSession(params.sessionId);
+        if (cancelled) return;
+        setSessionSnapshot(session);
+
+        const { sessionToken: token } = await requestSessionToken(params.sessionId, {
+          userId: user.id,
+          accessToken: authSession.accessToken,
+        });
+
+        if (cancelled) return;
+        setSessionToken(token);
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : 'Failed to load session');
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    };
+
+    bootstrap().catch((err) => {
+      console.error(err);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [authReady, isAuthenticated, authSession?.accessToken, params.sessionId, user?.id]);
+
+  useEffect(() => {
+    if (!sessionSnapshot || !sessionToken) {
+      return;
+    }
+
+    if (stateProviderCleanupRef.current) {
+      stateProviderCleanupRef.current();
+      stateProviderCleanupRef.current = null;
+    }
+
+    const stateDocKey = sessionSnapshot.documents.state ?? 'state';
+    const stateDocName = `${sessionSnapshot.sessionId}/${stateDocKey}`;
+    const doc = new Y.Doc();
+    const provider = new WebsocketProvider(wsBaseUrl, stateDocName, doc, {
+      params: { token: sessionToken },
+    });
+
+    stateDocRef.current = doc;
+    stateProviderRef.current = provider;
+
+    const settings = doc.getMap<string>('settings');
+
+    const handleSync = (isSynced: boolean) => {
+      if (!isSynced) {
+        return;
+      }
+      const requested =
+        pendingLanguageRef.current ??
+        (typeof settings.get('language') === 'string'
+          ? normalizeLanguage(settings.get('language') as string)
+          : defaultLanguage);
+
+      if (!settings.has('language')) {
+        doc.transact(() => {
+          settings.set('language', requested);
+        });
+      } else {
+        pendingLanguageRef.current = null;
+        applyLanguageSwitch(requested, { force: true });
+      }
+    };
+
+    const handleSettingsChange = () => {
+      const value = settings.get('language');
+      if (typeof value === 'string') {
+        pendingLanguageRef.current = null;
+        applyLanguageSwitch(value);
+      }
+    };
+
+    provider.on('sync', handleSync);
+    settings.observe(handleSettingsChange);
+
+    const cleanup = () => {
+      provider.off('sync', handleSync);
+      settings.unobserve(handleSettingsChange);
+      provider.destroy();
+      doc.destroy();
+      stateDocRef.current = null;
+      stateProviderRef.current = null;
+    };
+
+    stateProviderCleanupRef.current = cleanup;
+
+    return cleanup;
+  }, [applyLanguageSwitch, defaultLanguage, sessionSnapshot, sessionToken]);
+
+  useEffect(() => {
+    const editor = editorRef.current;
+    const monaco = monacoRef.current;
+    if (!editor || !monaco) {
+      return;
+    }
+
+    const model = editor.getModel();
+    if (model) {
+      monaco.editor.setModelLanguage(model, resolveMonacoLanguage(currentLanguage));
+    }
+  }, [currentLanguage]);
+
+  useEffect(() => {
+    const targetLanguage = pendingBindLanguageRef.current ?? currentLanguageRef.current;
+    const entry = ensureLanguageEntry(targetLanguage);
+    if (!entry) {
+      setConnectionStatus('connecting');
+    }
+  }, [ensureLanguageEntry, sessionSnapshot, sessionToken]);
+
+  const handleEditorMount = useCallback(
+    (editor: MonacoEditorNS.IStandaloneCodeEditor, monaco: Monaco) => {
+      editorRef.current = editor;
+      monacoRef.current = monaco;
+      setTimeout(() => editor.layout(), 0);
+      const language = currentLanguageRef.current;
+      bindEditorToLanguage(language);
+    },
+    [bindEditorToLanguage],
+  );
 
   const questionContent = useMemo(() => {
-    const question = sessionSnapshot?.question;
-    if (!question) return null;
+    const snapshot = sessionSnapshot;
+    if (!snapshot) return null;
 
-    const rawDifficulty = question.metadata?.difficulty ?? sessionSnapshot?.difficulty;
+    const question = snapshot.question;
+    const rawDifficulty = question.metadata?.difficulty ?? snapshot.difficulty;
     const difficulty = typeof rawDifficulty === 'string' ? (rawDifficulty.toLowerCase() as 'easy' | 'medium' | 'hard') : 'medium';
     const badgeColor = difficultyColor[difficulty] ?? 'default';
 
@@ -480,10 +618,40 @@ export default function SessionPage({ params }: { params: { sessionId: string } 
             ))}
           </Space>
         ) : null}
-        <ReactMarkdown className="markdown-body">{question.prompt}</ReactMarkdown>
+        <ReactMarkdown className="markdown-body" components={markdownComponents}>
+          {question.prompt}
+        </ReactMarkdown>
       </Space>
     );
   }, [sessionSnapshot]);
+
+  const participantBanner = useMemo(() => {
+    const snapshot = sessionSnapshot;
+    if (!snapshot) return null;
+
+    return (
+      <Space size="middle" wrap>
+        {snapshot.participants.map((participant) => {
+          const presence = presenceMap[participant.userId];
+          const connected = Boolean(presence?.connected);
+          const displayName = presence?.name ?? participant.displayName ?? participant.userId;
+
+          return (
+            <Badge
+              key={participant.userId}
+              status={connected ? 'success' : 'default'}
+              text={
+                <Space size="small">
+                  <Avatar size="small" icon={<UserOutlined />} />
+                  <Text>{displayName}</Text>
+                </Space>
+              }
+            />
+          );
+        })}
+      </Space>
+    );
+  }, [presenceMap, sessionSnapshot]);
 
   if (!authReady || (authReady && !isAuthenticated)) {
     return (
@@ -519,18 +687,18 @@ export default function SessionPage({ params }: { params: { sessionId: string } 
     );
   }
 
-  if (error || !sessionSnapshot) {
+  if (error) {
     return (
       <ConfigProvider theme={peerPrepTheme}>
         <Layout style={{ minHeight: '100vh', background: 'var(--bg)' }}>
           <Content className="main-content">
             <Result
               status="error"
-              title="Unable to load session"
-              subTitle={error ?? 'Unknown error'}
+              title="Unable to load collaboration session"
+              subTitle={error}
               extra={
-                <Button type="primary" href="/dashboard">
-                  Back to dashboard
+                <Button type="primary" onClick={() => router.push('/dashboard')}>
+                  Back to Dashboard
                 </Button>
               }
             />
@@ -541,8 +709,10 @@ export default function SessionPage({ params }: { params: { sessionId: string } 
   }
 
   const sessionTitle =
-    sessionSnapshot.question?.title ??
-    `Session ${sessionSnapshot.sessionId.slice(-6).toUpperCase()}`;
+    sessionSnapshot
+      ? sessionSnapshot.question?.title ??
+        `Session ${sessionSnapshot.sessionId.slice(-6).toUpperCase()}`
+      : 'Session';
 
   return (
     <ConfigProvider theme={peerPrepTheme}>
@@ -557,7 +727,15 @@ export default function SessionPage({ params }: { params: { sessionId: string } 
               flexWrap: 'wrap',
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 16,
+                flexWrap: 'wrap',
+                minWidth: 0,
+              }}
+            >
               <svg
                 width="24"
                 height="24"
@@ -588,12 +766,33 @@ export default function SessionPage({ params }: { params: { sessionId: string } 
                   strokeLinejoin="round"
                 />
               </svg>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <Title level={4} style={{ margin: 0, color: '#fff' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 0, flex: 1 }}>
+                <Title level={4} style={{ margin: 0, color: '#fff', lineHeight: 1.2 }}>
                   PeerPrep Collaboration Session
                 </Title>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-                  <Text style={{ color: 'var(--muted)' }}>{sessionTitle}</Text>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 12,
+                    flexWrap: 'wrap',
+                    color: 'var(--muted)',
+                    minWidth: 0,
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: 'var(--muted)',
+                      margin: 0,
+                      minWidth: 0,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      flex: 1,
+                    }}
+                  >
+                    {sessionTitle}
+                  </Text>
                   <Tag
                     icon={<LinkOutlined />}
                     color={
@@ -613,9 +812,10 @@ export default function SessionPage({ params }: { params: { sessionId: string } 
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: 24,
-                flexWrap: 'wrap',
                 justifyContent: 'flex-end',
+                flexWrap: 'wrap',
+                gap: 16,
+                rowGap: 12,
               }}
             >
               {participantBanner}
@@ -671,16 +871,12 @@ export default function SessionPage({ params }: { params: { sessionId: string } 
                     <Select
                       size="small"
                       value={currentLanguage}
-                      onChange={(value) => {
-                        const normalized = normalizeLanguage(value);
-                        settingsMap.set('language', normalized);
-                        setCurrentLanguage(normalized);
-                      }}
+                      onChange={handleLanguageChange}
                       style={{ minWidth: 140 }}
                       popupMatchSelectWidth={false}
                       dropdownStyle={{ background: '#fff', color: '#000' }}
                     >
-                      {LANGUAGE_OPTIONS.map((option) => (
+                      {languageOptions.map((option) => (
                         <Select.Option key={option.value} value={option.value} style={{ color: '#000' }}>
                           {option.label}
                         </Select.Option>
@@ -691,7 +887,7 @@ export default function SessionPage({ params }: { params: { sessionId: string } 
                 <div style={{ flex: 1, minHeight: 520 }}>
                   <MonacoEditor
                     height="100%"
-                    language={currentLanguage}
+                    language={resolveMonacoLanguage(currentLanguage)}
                     theme="vs-dark"
                     options={{
                       fontSize: 14,
@@ -700,9 +896,6 @@ export default function SessionPage({ params }: { params: { sessionId: string } 
                       lineNumbers: 'on',
                     }}
                     onMount={handleEditorMount}
-                    onChange={() => {
-                      // No-op: Yjs binding already syncs content; change handler allows React 18 strict mode compatibility.
-                    }}
                   />
                 </div>
               </Card>

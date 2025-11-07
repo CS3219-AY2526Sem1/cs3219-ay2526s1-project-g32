@@ -42,6 +42,7 @@ export type PublicUser = {
   emailConfirmed: boolean;
   createdAt: string;
   userMetadata: Record<string, unknown>;
+  isAdmin: boolean;
 };
 
 export type LoginResponse = {
@@ -114,6 +115,7 @@ export const fetchMe = async (accessToken: string) =>
 export type CreateMatchRequest = {
   difficulty: 'Easy' | 'Medium' | 'Hard';
   topic: string;
+  displayName: string;
 };
 
 export type MatchResponse = {
@@ -126,6 +128,8 @@ export type MatchResponse = {
 export type MatchStatusResponse = {
   status: 'pending' | 'success' | 'not_found';
   sessionId?: string;
+  // prompt indicates backend is asking user whether to expand search to other difficulties
+  prompt?: boolean;
 };
 
 export type CancelMatchRequest = {
@@ -135,7 +139,12 @@ export type CancelMatchRequest = {
 // Matching Service API Functions
 const withMatchingUrl = (path: string) => `${MATCHING_SERVICE_URL}${path}`;
 
-export const startMatchmaking = async (topic: string, difficulty: string, accessToken: string) =>
+export const startMatchmaking = async (
+  topic: string,
+  difficulty: string,
+  accessToken: string,
+  displayName: string,
+) =>
   handleResponse<MatchResponse>(
     await fetch(withMatchingUrl('/requests'), {
       method: 'POST',
@@ -143,7 +152,7 @@ export const startMatchmaking = async (topic: string, difficulty: string, access
         ...jsonHeaders,
         Authorization: `Bearer ${accessToken}`,
       },
-      body: JSON.stringify({ topic, difficulty }),
+      body: JSON.stringify({ topic, difficulty, displayName }),
     }),
   );
 
@@ -161,6 +170,18 @@ export const cancelMatch = async (topic: string, accessToken: string) =>
   handleResponse<{ message: string }>(
     await fetch(withMatchingUrl('/requests'), {
       method: 'DELETE',
+      headers: {
+        ...jsonHeaders,
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({ topic }),
+    }),
+  );
+
+export const acceptExpand = async (topic: string, accessToken: string) =>
+  handleResponse<{ message: string }>(
+    await fetch(withMatchingUrl('/requests/expand'), {
+      method: 'POST',
       headers: {
         ...jsonHeaders,
         Authorization: `Bearer ${accessToken}`,
@@ -304,6 +325,5 @@ export const getRandomQuestion = async (params?: {
     }),
   );
 };
-
 
 

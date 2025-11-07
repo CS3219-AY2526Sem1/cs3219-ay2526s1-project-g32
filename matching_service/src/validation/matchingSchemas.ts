@@ -5,18 +5,45 @@ const difficultyEnum = z.enum(['Easy', 'Medium', 'Hard'], {
   message: 'Difficulty must be Easy, Medium, or Hard'
 });
 
-// Define valid topics (you can expand this list)
+// Define valid topics (kept in sync with Question Service topics)
 const topicEnum = z.enum([
-  'Array', 
-  'String', 
-  'Linked List', 
-  'Tree', 
-  'Graphs', 
+  'Array',
+  'Backtracking',
+  'Binary Search',
+  'Binary Tree',
+  'Bit Manipulation',
+  'Bitmask',
+  'Breadth-First Search',
+  'Counting',
+  'Concurrency',
+  'Design',
+  'Divide and Conquer',
   'Dynamic Programming',
-  'Sorting',
-  'Searching',
+  'Enumeration',
+  'Game Theory',
+  'Geometry',
+  'Greedy',
+  'Graph',
   'Hash Table',
-  'Stacks and Queues'
+  'Heap (Priority Queue)',
+  'Linked List',
+  'Matrix',
+  'Math',
+  'Monotonic Stack',
+  'Ordered Set',
+  'Prefix Sum',
+  'Recursion',
+  'Segment Tree',
+  'Shell',
+  'Simulation',
+  'Sliding Window',
+  'Sorting',
+  'Stack',
+  'String',
+  'Topological Sort',
+  'Tree',
+  'Two Pointers',
+  'Union Find'
 ], {
   message: 'Invalid topic selected'
 });
@@ -36,6 +63,10 @@ export const createMatchRequestSchema = {
   body: z.object({
     difficulty: difficultyEnum,
     topic: topicEnum,
+    displayName: z
+      .string()
+      .min(1, 'Display name is required')
+      .max(100, 'Display name must be at most 100 characters'),
   }),
 };
 
@@ -68,6 +99,17 @@ export const handleRequeueSchema = {
   body: z.object({
     userId: userIdField,
     difficulty: difficultyEnum,
+    topic: topicEnum,
+    displayName: z.string().max(100).optional(),
+  }),
+};
+
+/**
+ * Schema for accepting expand prompt
+ * POST /api/v1/matching/requests/expand
+ */
+export const expandMatchSchema = {
+  body: z.object({
     topic: topicEnum,
   }),
 };
