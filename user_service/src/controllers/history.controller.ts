@@ -59,6 +59,7 @@ type CreateHistoryAttemptBody = {
   sessionId: string;
   matchId?: string | null;
   questionId?: number | null;
+  questionTitle?: string | null;
   startedAt?: string | null;
   endedAt?: string | null;
   participants: Array<{ userId: string; displayName?: string }>;
@@ -83,6 +84,7 @@ export const createHistoryAttemptHandler = async (
       id: body.sessionId,
       match_id: body.matchId ?? null,
       question_id: typeof body.questionId === 'number' ? body.questionId : null,
+      question_title: body.questionTitle ?? null,
       started_at: body.startedAt ?? null,
       ended_at: body.endedAt ?? null,
       code_python: body.code?.python ?? null,

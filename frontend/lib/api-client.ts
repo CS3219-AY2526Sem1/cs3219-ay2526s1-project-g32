@@ -78,6 +78,7 @@ export type SessionAttemptRecord = {
   id: string;
   match_id: string | null;
   question_id: number | null;
+  question_title: string | null;
   started_at: string | null;
   ended_at: string | null;
   participants?: Record<string, unknown> | null;

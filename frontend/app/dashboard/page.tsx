@@ -10,7 +10,6 @@ import { useRequireAuth } from "../../hooks/useRequireAuth";
 import { peerPrepTheme } from "../../lib/theme";
 import { fetchActiveSessionForUser, type ActiveSessionResponse } from "../../lib/collab-client";
 import { fetchUserHistory, fetchSessionAttemptDetail } from "../../lib/api-client";
-import { fetchQuestionById } from "../../lib/question-client";
 
 const { Header, Content } = Layout;
 const { Title, Text } = Typography;
@@ -100,6 +99,7 @@ export default function DashboardPage() {
               return {
                 sessionAttemptId: detail.id ?? attempt.session_attempt_id,
                 questionId: detail.question_id ?? null,
+                questionTitle: detail.question_title ?? null,
                 endedAt: detail.ended_at ?? null,
               };
             } catch {
@@ -111,36 +111,20 @@ export default function DashboardPage() {
         if (cancelled) return;
 
         const validDetails = details.filter(
-          (detail): detail is { sessionAttemptId: string; questionId: number | null; endedAt: string | null } =>
-            Boolean(detail && detail.sessionAttemptId),
+          (
+            detail,
+          ): detail is {
+            sessionAttemptId: string;
+            questionId: number | null;
+            questionTitle: string | null;
+            endedAt: string | null;
+          } => Boolean(detail && detail.sessionAttemptId),
         );
 
         if (validDetails.length === 0) {
           setHistoryItems([]);
           return;
         }
-
-        const uniqueQuestionIds = Array.from(
-          new Set(
-            validDetails
-              .map((detail) => detail.questionId)
-              .filter((id): id is number => typeof id === "number" && Number.isFinite(id)),
-          ),
-        );
-
-        const questionTitleMap = new Map<number, string>();
-        await Promise.all(
-          uniqueQuestionIds.map(async (questionId) => {
-            try {
-              const question = await fetchQuestionById(questionId);
-              questionTitleMap.set(questionId, question.title);
-            } catch {
-              questionTitleMap.set(questionId, `Question #${questionId}`);
-            }
-          }),
-        );
-
-        if (cancelled) return;
 
         const toTimestamp = (value: string | null) => {
           if (!value) return 0;
@@ -152,9 +136,11 @@ export default function DashboardPage() {
           .map((detail) => ({
             sessionAttemptId: detail.sessionAttemptId,
             questionTitle:
-              detail.questionId !== null
-                ? questionTitleMap.get(detail.questionId) ?? `Question #${detail.questionId}`
-                : "Unknown question",
+              typeof detail.questionTitle === "string" && detail.questionTitle.trim().length > 0
+                ? detail.questionTitle
+                : detail.questionId !== null
+                  ? `Question #${detail.questionId}`
+                  : "Unknown question",
             endedAt: detail.endedAt,
           }))
           .sort((a, b) => toTimestamp(b.endedAt) - toTimestamp(a.endedAt));

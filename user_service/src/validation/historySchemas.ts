@@ -11,6 +11,7 @@ export const createHistoryAttemptSchema = {
     sessionId: z.string().uuid(),
     matchId: z.string().optional().nullable(),
     questionId: z.number().int().optional().nullable(),
+    questionTitle: z.string().min(1).optional().nullable(),
     startedAt: z.string().datetime().optional().nullable(),
     endedAt: z.string().datetime().optional().nullable(),
     participants: z

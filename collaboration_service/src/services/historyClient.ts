@@ -2,6 +2,7 @@ export type SessionAttemptPayload = {
   sessionId: string;
   matchId?: string | null;
   questionId?: number | null;
+  questionTitle?: string | null;
   startedAt?: string | null;
   endedAt?: string | null;
   participants: Array<{ userId: string; displayName?: string }>;

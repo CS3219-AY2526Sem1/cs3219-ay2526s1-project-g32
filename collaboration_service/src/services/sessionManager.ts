@@ -339,6 +339,7 @@ export class SessionManager {
         sessionId: session.sessionId,
         matchId: session.matchId,
         questionId: Number.isFinite(numericQuestionId) ? numericQuestionId : undefined,
+        questionTitle: session.question.title,
         startedAt: session.createdAt ?? null,
         endedAt: session.endedAt ?? new Date().toISOString(),
         participants: session.participants.map((participant) => ({

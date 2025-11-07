@@ -6,6 +6,7 @@ export type SessionAttemptRecord = {
   id: string;
   match_id: string | null;
   question_id: number | null;
+  question_title: string | null;
   started_at: string | null;
   ended_at: string | null;
   code_python: string | null;
@@ -25,6 +26,7 @@ export type SessionAttemptInsert = {
   id: string;
   match_id: string | null;
   question_id: number | null;
+  question_title: string | null;
   started_at: string | null;
   ended_at: string | null;
   code_python: string | null;
@@ -60,6 +62,7 @@ export class SessionAttemptRepository {
           'id',
           'match_id',
           'question_id',
+          'question_title',
           'started_at',
           'ended_at',
           'code_python',
@@ -86,6 +89,7 @@ export class SessionAttemptRepository {
         id: record.id,
         match_id: record.match_id,
         question_id: record.question_id,
+        question_title: record.question_title,
         started_at: record.started_at,
         ended_at: record.ended_at,
         code_python: record.code_python,
