@@ -1,5 +1,6 @@
 ﻿const API_BASE_URL = process.env.NEXT_PUBLIC_USER_SERVICE_URL ?? 'http://localhost:4001/api/v1';
 const MATCHING_SERVICE_URL = process.env.NEXT_PUBLIC_MATCHING_SERVICE_URL ?? 'http://localhost:3002/api/v1/matching';
+const QUESTION_SERVICE_URL = process.env.NEXT_PUBLIC_QUESTION_SERVICE_URL ?? 'http://localhost:4003/api/v1/questions';
 const DEFAULT_VERIFY_REDIRECT =
   process.env.NEXT_PUBLIC_VERIFY_REDIRECT ?? 'http://localhost:3000/verify-success';
 
@@ -167,5 +168,142 @@ export const cancelMatch = async (topic: string, accessToken: string) =>
       body: JSON.stringify({ topic }),
     }),
   );
+
+// Question Service API Types
+export type CreateQuestionPayload = {
+  title: string;
+  slug: string;
+  description: string;
+  difficulty: 'Easy' | 'Medium' | 'Hard';
+  topics: string[];
+  starter_python?: string;
+  starter_c?: string;
+  starter_cpp?: string;
+  starter_java?: string;
+  starter_javascript?: string;
+};
+
+export type Question = {
+  id: number;
+  title: string;
+  slug: string;
+  description: string;
+  difficulty: 'Easy' | 'Medium' | 'Hard';
+  topics: string[];
+  starterCode?: {
+    python?: string;
+    c?: string;
+    cpp?: string;
+    java?: string;
+    javascript?: string;
+  };
+};
+
+export type QuestionResponse = {
+  id: number;
+  title: string;
+  slug: string;
+  description: string;
+  difficulty: string;
+  topics: string[];
+  starterCode: {
+    python: string | null;
+    c: string | null;
+    cpp: string | null;
+    java: string | null;
+    javascript: string | null;
+  };
+};
+
+export type QuestionsListResponse = {
+  questions: QuestionResponse[];
+  total: number;
+  limit: number;
+  offset: number;
+};
+
+// Question Service API Functions
+const withQuestionUrl = (path: string) => `${QUESTION_SERVICE_URL}${path}`;
+
+export const createQuestion = async (payload: CreateQuestionPayload) =>
+  handleResponse<QuestionResponse>(
+    await fetch(withQuestionUrl(''), {
+      method: 'POST',
+      headers: jsonHeaders,
+      body: JSON.stringify(payload),
+    }),
+  );
+
+export const getQuestions = async (params?: {
+  title?: string;
+  difficulty?: string;
+  topic?: string;
+  limit?: number;
+  offset?: number;
+}) => {
+  const queryParams = new URLSearchParams();
+  if (params?.title) queryParams.append('title', params.title);
+  if (params?.difficulty) queryParams.append('difficulty', params.difficulty);
+  if (params?.topic) queryParams.append('topic', params.topic);
+  if (params?.limit) queryParams.append('limit', params.limit.toString());
+  if (params?.offset) queryParams.append('offset', params.offset.toString());
+
+  const url = queryParams.toString() 
+    ? `${withQuestionUrl('')}?${queryParams.toString()}`
+    : withQuestionUrl('');
+
+  return handleResponse<QuestionsListResponse>(
+    await fetch(url, {
+      method: 'GET',
+      headers: jsonHeaders,
+    }),
+  );
+};
+
+export const getQuestionById = async (id: number) =>
+  handleResponse<QuestionResponse>(
+    await fetch(withQuestionUrl(`/${id}`), {
+      method: 'GET',
+      headers: jsonHeaders,
+    }),
+  );
+
+export const updateQuestion = async (id: number, payload: Partial<CreateQuestionPayload>) =>
+  handleResponse<QuestionResponse>(
+    await fetch(withQuestionUrl(`/${id}`), {
+      method: 'PUT',
+      headers: jsonHeaders,
+      body: JSON.stringify(payload),
+    }),
+  );
+
+export const deleteQuestion = async (id: number) =>
+  handleResponse<{ message: string }>(
+    await fetch(withQuestionUrl(`/${id}`), {
+      method: 'DELETE',
+      headers: jsonHeaders,
+    }),
+  );
+
+export const getRandomQuestion = async (params?: {
+  difficulty?: string;
+  topic?: string;
+}) => {
+  const queryParams = new URLSearchParams();
+  if (params?.difficulty) queryParams.append('difficulty', params.difficulty);
+  if (params?.topic) queryParams.append('topic', params.topic);
+
+  const url = queryParams.toString()
+    ? `${withQuestionUrl('/random')}?${queryParams.toString()}`
+    : withQuestionUrl('/random');
+
+  return handleResponse<QuestionResponse>(
+    await fetch(url, {
+      method: 'GET',
+      headers: jsonHeaders,
+    }),
+  );
+};
+
 
 
