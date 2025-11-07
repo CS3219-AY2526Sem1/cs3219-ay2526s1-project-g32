@@ -1,11 +1,23 @@
 import { Router } from 'express';
 
-import { listHistoryHandler, getHistoryDetailHandler } from '../controllers/history.controller';
+import {
+  listHistoryHandler,
+  getHistoryDetailHandler,
+  createHistoryAttemptHandler,
+} from '../controllers/history.controller';
 import { authenticate } from '../middleware/authenticate';
+import { requireInternalKey } from '../middleware/requireInternalKey';
 import { validateRequest } from '../middleware/validateRequest';
-import { historyDetailSchema } from '../validation/historySchemas';
+import { historyDetailSchema, createHistoryAttemptSchema } from '../validation/historySchemas';
 
 const router = Router();
+
+router.post(
+  '/attempts',
+  requireInternalKey,
+  validateRequest(createHistoryAttemptSchema),
+  createHistoryAttemptHandler,
+);
 
 router.use(authenticate);
 

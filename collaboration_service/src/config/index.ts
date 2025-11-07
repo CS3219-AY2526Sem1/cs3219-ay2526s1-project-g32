@@ -54,6 +54,7 @@ export const config = {
     },
     user: {
       baseUrl: env.USER_SERVICE_URL,
+      internalKey: env.USER_SERVICE_INTERNAL_KEY,
     },
   },
   jwt: {
