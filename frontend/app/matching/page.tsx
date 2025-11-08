@@ -130,7 +130,7 @@ export default function MatchingPage() {
     }
 
     setIsMatching(true);
-  // reset decline state for a fresh matching attempt
+  // Reset decline state for a fresh matching attempt
   setExpandDeclined(false);
     
     try {
