@@ -231,12 +231,26 @@ This script will:
 
 All endpoints use Zod for runtime type validation:
 
+### Request Body Validation
+
 - **Title:** Required, minimum 1 character
-- **Slug:** Required, minimum 1 character, URL-friendly format
+- **Slug:** Required, minimum 1 character, URL-friendly format (lowercase alphanumeric with hyphens)
 - **Description:** Required, minimum 10 characters
-- **Difficulty:** Required text field (typically Easy, Medium, or Hard)
+- **Difficulty:** Required, must be one of: `Easy`, `Medium`, or `Hard`
 - **Topics:** Array of 1-10 strings (each 1-50 characters)
 - **Starter Code:** Optional text fields for Python, C, C++, Java, and JavaScript
+
+### URL Parameter Validation
+
+- **ID Parameter** (`/:id`): Must be a positive integer
+- **Slug Parameter** (`/slug/:slug`): Must be lowercase alphanumeric with hyphens only (e.g., `two-sum`, `reverse-linked-list`), maximum 100 characters
+
+### Query Parameter Validation
+
+- **Difficulty Filter** (`?difficulty=`): Must be `Easy`, `Medium`, or `Hard`
+- **Topic Filter** (`?topic=`): String value
+- **Limit** (`?limit=`): Positive integer between 1 and 100
+- **Offset** (`?offset=`): Non-negative integer
 
 Invalid requests return 400 with detailed error messages:
 
@@ -278,6 +292,7 @@ The `parseTopics()` helper function automatically detects and parses the format,
 
 ## Recent Updates (November 2025)
 
+- **Added slug endpoint validation** with Zod schema to ensure proper slug format (lowercase, hyphens, alphanumeric)
 - **Added GET by slug endpoint** (`GET /api/v1/questions/slug/:slug`) for retrieving questions by URL-friendly identifiers
 - **Migrated to questionsv3 table** with improved schema design
 - **Added multi-language starter code** support (Python, C, C++, Java, JavaScript)
