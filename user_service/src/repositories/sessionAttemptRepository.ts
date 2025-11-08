@@ -43,15 +43,19 @@ export class SessionAttemptRepository {
   async listUserAttempts(userId: string): Promise<UserAttemptRecord[]> {
     const { data, error } = await this.client
       .from('user_attempts')
-      .select('user_id, session_attempt_id')
-      .eq('user_id', userId)
+      .select('id, session_attempt_id')
+      .eq('id', userId)
       .order('session_attempt_id', { ascending: false });
 
     if (error) {
       throw error;
     }
 
-    return (data as UserAttemptRecord[]) ?? [];
+    const rows = (data as Array<{ id: string; session_attempt_id: string }>) ?? [];
+    return rows.map((row) => ({
+      user_id: row.id,
+      session_attempt_id: row.session_attempt_id,
+    }));
   }
 
   async getSessionAttempt(sessionAttemptId: string): Promise<SessionAttemptRecord | null> {

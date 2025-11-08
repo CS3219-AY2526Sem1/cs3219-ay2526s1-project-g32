@@ -365,7 +365,7 @@ export default function DashboardPage() {
                   </div>
                 ) : historyItems.length === 0 ? (
                   <div style={{ padding: "24px" }}>
-                    <Text style={{ color: "var(--muted)" }}>No past attempts yet.</Text>
+                    <Text style={{ color: "var(--muted)" }}>No recent attempts! Try coding something</Text>
                   </div>
                 ) : (
                   <div style={{ maxHeight: 320, overflowY: "auto" }}>

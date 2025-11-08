@@ -1,7 +1,5 @@
 'use client';
 
-/* eslint-disable @next/next/no-img-element */
-
 import dynamic from 'next/dynamic';
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -99,6 +97,8 @@ const selectInitialLanguage = (codeMap: Record<string, string>) => {
 export default function SessionHistoryPage({ params }: { params: { sessionId: string } }) {
   const router = useRouter();
   const { session: authSession, isAuthenticated, isReady: authReady } = useAuth();
+  const EDITOR_MIN_HEIGHT = 420;
+  const EDITOR_HEIGHT = '60vh';
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -211,7 +211,8 @@ export default function SessionHistoryPage({ params }: { params: { sessionId: st
   const difficultyKey = question?.difficulty
     ? (normalizeLanguage(question.difficulty) as 'easy' | 'medium' | 'hard')
     : undefined;
-  const topics = question?.topics ?? [];
+  const difficultyLabel = question?.difficulty ?? null;
+  const topics = Array.isArray(question?.topics) ? question.topics : [];
   const codeValue = codeByLanguage[currentLanguage] ?? '';
   const startedAt = attempt?.started_at
     ? new Date(attempt.started_at).toLocaleString()
@@ -279,84 +280,98 @@ export default function SessionHistoryPage({ params }: { params: { sessionId: st
               flexWrap: 'wrap',
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 16, minWidth: 0 }}>
-              <div
-                style={{
-                  width: 48,
-                  height: 48,
-                  borderRadius: 16,
-                  background: 'rgba(255, 255, 255, 0.08)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 16,
+                flexWrap: 'wrap',
+                minWidth: 0,
+              }}
+            >
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+                style={{ color: 'var(--primary-600)' }}
               >
-                <svg
-                  width="28"
-                  height="28"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                  style={{ color: 'var(--primary-500)' }}
-                >
-                  <path
-                    d="M12 2L2 7L12 12L22 7L12 2Z"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                  <path
-                    d="M2 17L12 22L22 17"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                  <path
-                    d="M2 12L12 17L22 12"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
-                <Text style={{ color: 'var(--muted)', fontSize: 12, letterSpacing: 0.5 }}>
-                  Peerprep Collaboration Session History
-                </Text>
-                <Text
+                <path
+                  d="M12 2L2 7L12 12L22 7L12 2Z"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+                <path
+                  d="M2 17L12 22L22 17"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+                <path
+                  d="M2 12L12 17L22 12"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 0, flex: 1 }}>
+                <Title level={4} style={{ margin: 0, color: '#fff', lineHeight: 1.2 }}>
+                  PeerPrep Collaboration Session History
+                </Title>
+                <div
                   style={{
-                    color: '#fff',
-                    fontSize: 20,
-                    fontWeight: 600,
-                    lineHeight: 1.2,
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 12,
+                    flexWrap: 'wrap',
+                    color: 'var(--muted)',
                   }}
                 >
-                  {sessionTitle}
-                </Text>
-                <Space size="small" wrap>
-                  {question?.difficulty && (
-                    <Tag
-                      color={difficultyKey ? difficultyColor[difficultyKey] : 'default'}
-                      style={{ marginInlineEnd: 0 }}
-                    >
-                      {question.difficulty}
+                  <Text
+                    style={{
+                      color: 'var(--muted)',
+                      margin: 0,
+                      minWidth: 0,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      flex: 1,
+                    }}
+                  >
+                    {sessionTitle}
+                  </Text>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      <Tag
+                        color={difficultyKey ? difficultyColor[difficultyKey] : 'default'}
+                        style={{ marginInlineEnd: 0 }}
+                      >
+                        {difficultyLabel}
+                      </Tag>
+                    <Tag icon={<ReadOutlined />} color="geekblue" style={{ marginInlineEnd: 0 }}>
+                      Read only
                     </Tag>
-                  )}
-                  <Tag icon={<ReadOutlined />} color="geekblue" style={{ marginInlineEnd: 0 }}>
-                    Read only
-                  </Tag>
-                </Space>
+                  </div>
+                </div>
               </div>
             </div>
-            <Button type="primary" icon={<LogoutOutlined />} onClick={handleExit}>
-              Exit
-            </Button>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'flex-end',
+                flexWrap: 'wrap',
+                gap: 16,
+              }}
+            >
+              <Button type="primary" icon={<LogoutOutlined />} onClick={handleExit}>
+                Exit
+              </Button>
+            </div>
           </div>
         </Header>
 
@@ -444,12 +459,19 @@ export default function SessionHistoryPage({ params }: { params: { sessionId: st
                     </Select>
                   </Space>
                 </div>
-                <div style={{ flex: 1 }}>
+                <div
+                  style={{
+                    flex: 1,
+                    minHeight: EDITOR_MIN_HEIGHT,
+                    height: EDITOR_HEIGHT,
+                    position: 'relative',
+                  }}
+                >
                   {loading ? (
                     <Skeleton active paragraph={{ rows: 12 }} style={{ padding: 24 }} />
                   ) : (
                     <MonacoEditor
-                      height="100%"
+                      height={EDITOR_HEIGHT}
                       language={resolveMonacoLanguage(currentLanguage)}
                       value={codeValue}
                       theme="vs-dark"
@@ -459,6 +481,7 @@ export default function SessionHistoryPage({ params }: { params: { sessionId: st
                         scrollBeyondLastLine: false,
                         readOnly: true,
                         lineNumbers: 'on',
+                        wordWrap: 'on',
                       }}
                     />
                   )}
