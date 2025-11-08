@@ -737,16 +737,15 @@ export default function AdminPage() {
                   </div>
 
                   {/* Error/Success Messages */}
-                  {!isDeleteMode && error && (
+                  {error && (
                     <Alert type="error" showIcon message={error} closable onClose={() => setError(null)} />
                   )}
-                  {!isDeleteMode && success && (
+                  {success && (
                     <Alert type="success" showIcon message={success} closable onClose={() => setSuccess(null)} />
                   )}
 
                   {/* Action Buttons */}
-                  {!isDeleteMode && (
-                    <Space size="middle" style={{ width: '100%', justifyContent: 'flex-end' }}>
+                  <Space size="middle" style={{ width: '100%', justifyContent: 'flex-end' }}>
                       <Button
                         size="large"
                         icon={<CloseOutlined />}
@@ -772,7 +771,6 @@ export default function AdminPage() {
                         {isEditMode ? 'Update Question' : 'Create Question'}
                       </Button>
                     </Space>
-                  )}
                     </>
                   )}
                 </Space>
