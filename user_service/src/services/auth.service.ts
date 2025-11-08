@@ -170,3 +170,29 @@ export const updateUserAdminStatus = async (userId: string, isAdmin: boolean) =>
 
   return updated;
 };
+
+export const getUserByEmail = async (email: string) => {
+  const { data, error } = await supabaseAdminClient.auth.admin.listUsers();
+
+  if (error) {
+    throw new HttpError(error.status ?? 400, error.message, error);
+  }
+
+  const user = data.users.find(u => u.email?.toLowerCase() === email.toLowerCase());
+
+  if (!user) {
+    throw new HttpError(404, `User with email ${email} not found`);
+  }
+
+  return toPublicUser(user);
+};
+
+export const updateUserAdminStatusByEmail = async (email: string, isAdmin: boolean) => {
+  const user = await getUserByEmail(email);
+  
+  if (!user) {
+    throw new HttpError(404, `User with email ${email} not found`);
+  }
+
+  return updateUserAdminStatus(user.id, isAdmin);
+};

@@ -111,6 +111,30 @@ export const fetchMe = async (accessToken: string) =>
     }),
   );
 
+export const setAdminStatus = async (userId: string, isAdmin: boolean, accessToken: string) =>
+  handleResponse<{ user: PublicUser }>(
+    await fetch(withBaseUrl(`/auth/users/${userId}/admin`), {
+      method: 'PATCH',
+      headers: {
+        ...jsonHeaders,
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({ isAdmin }),
+    }),
+  );
+
+export const setAdminStatusByEmail = async (email: string, isAdmin: boolean, accessToken: string) =>
+  handleResponse<{ user: PublicUser }>(
+    await fetch(withBaseUrl('/auth/admin/set-by-email'), {
+      method: 'PATCH',
+      headers: {
+        ...jsonHeaders,
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({ email, isAdmin }),
+    }),
+  );
+
 // Matching Service API Types
 export type CreateMatchRequest = {
   difficulty: 'Easy' | 'Medium' | 'Hard';
