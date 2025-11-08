@@ -83,7 +83,14 @@ export async function connectRabbitMQ() {
     console.log('[RabbitMQ] Connected and timeout queues are ready.');
   } catch (error) {
     console.error('[RabbitMQ] Failed to connect or set up:', error);
-    // In a real app, you might want to implement retry logic here.
+    // Retry with exponential backoff. Keep trying so the service recovers
+    // when RabbitMQ becomes available (Docker may start it slightly later).
+    const retryDelayMs = 3000;
+    console.log(`[RabbitMQ] Will retry connection in ${retryDelayMs}ms...`);
+    setTimeout(() => {
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
+      connectRabbitMQ();
+    }, retryDelayMs);
   }
 }
 
@@ -144,10 +151,12 @@ class TimeoutService {
    */
   public startTimeoutConsumer(): void {
     if (!channel) {
-      console.error('[TimeoutService] RabbitMQ channel is not available. Cannot start consumer.');
+      console.warn('[TimeoutService] RabbitMQ channel is not available yet. Will retry consumer start in 2000ms...');
+      setTimeout(() => this.startTimeoutConsumer(), 2000);
       return;
     }
 
+    // Register the consumer and log the consumerTag returned by the broker
     channel.consume(TIMEOUT_QUEUE_NAME, async (msg) => {
       if (msg) {
         try {
@@ -248,9 +257,17 @@ class TimeoutService {
           channel?.nack(msg, false, false); // Discard the message on error
         }
       }
-    });
+    })
+      .then((ok) => {
+        console.log('[TimeoutService] Timeout consumer registered with consumerTag=', ok.consumerTag);
+      })
+      .catch((err) => {
+        console.error('[TimeoutService] Failed to start timeout consumer:', err);
+        console.warn('[TimeoutService] Will retry consumer start in 2000ms...');
+        setTimeout(() => this.startTimeoutConsumer(), 2000);
+      });
 
-    console.log('[TimeoutService] Timeout consumer started and is waiting for expired messages.');
+    console.log('[TimeoutService] Timeout consumer start requested.');
   }
 }
 
