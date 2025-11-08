@@ -84,6 +84,7 @@ question_service/
 | `POST /api/v1/questions` | Create a new question (requires title, description, difficulty, topics). |
 | `GET /api/v1/questions` | Get all questions with optional filters (title, difficulty, topic). |
 | `GET /api/v1/questions/random` | Get a random question with optional difficulty/topic filters (used by matching service). |
+| `GET /api/v1/questions/slug/:slug` | Get a specific question by its slug (URL-friendly identifier). |
 | `GET /api/v1/questions/:id` | Get a specific question by ID. |
 | `PUT /api/v1/questions/:id` | Update an existing question (partial updates supported). |
 | `DELETE /api/v1/questions/:id` | Delete a question by ID. |
@@ -112,6 +113,59 @@ All questions return data in the following format:
 ```
 
 > **Note:** The `topic` field (singular) returns the first topic for compatibility with collaboration service, while `topics` contains the full array. Image URLs are embedded in the description field.
+
+### API Usage Examples
+
+#### Get Question by Slug
+```bash
+# Request
+GET /api/v1/questions/slug/two-sum
+
+# Response (200 OK)
+{
+  "id": 1,
+  "title": "Two Sum",
+  "slug": "two-sum",
+  "description": "Given an array of integers...",
+  "difficulty": "Easy",
+  "topics": ["Array", "Hash Table"],
+  "starterCode": { ... }
+}
+
+# Not Found (404)
+{
+  "error": "Question not found"
+}
+```
+
+#### Get Question by ID
+```bash
+# Request
+GET /api/v1/questions/1
+
+# Response (200 OK)
+{
+  "id": 1,
+  "title": "Two Sum",
+  "slug": "two-sum",
+  ...
+}
+```
+
+#### Get Random Question
+```bash
+# Request
+GET /api/v1/questions/random?difficulty=Medium&topic=Array
+
+# Response (200 OK)
+{
+  "id": 42,
+  "title": "Product of Array Except Self",
+  "topic": "Array",
+  "topics": ["Array", "Prefix Sum"],
+  ...
+}
+```
 
 ## Database Schema
 
@@ -177,12 +231,26 @@ This script will:
 
 All endpoints use Zod for runtime type validation:
 
+### Request Body Validation
+
 - **Title:** Required, minimum 1 character
-- **Slug:** Required, minimum 1 character, URL-friendly format
+- **Slug:** Required, minimum 1 character, URL-friendly format (lowercase alphanumeric with hyphens)
 - **Description:** Required, minimum 10 characters
-- **Difficulty:** Required text field (typically Easy, Medium, or Hard)
+- **Difficulty:** Required, must be one of: `Easy`, `Medium`, or `Hard`
 - **Topics:** Array of 1-10 strings (each 1-50 characters)
 - **Starter Code:** Optional text fields for Python, C, C++, Java, and JavaScript
+
+### URL Parameter Validation
+
+- **ID Parameter** (`/:id`): Must be a positive integer
+- **Slug Parameter** (`/slug/:slug`): Must be lowercase alphanumeric with hyphens only (e.g., `two-sum`, `reverse-linked-list`), maximum 100 characters
+
+### Query Parameter Validation
+
+- **Difficulty Filter** (`?difficulty=`): Must be `Easy`, `Medium`, or `Hard`
+- **Topic Filter** (`?topic=`): String value
+- **Limit** (`?limit=`): Positive integer between 1 and 100
+- **Offset** (`?offset=`): Non-negative integer
 
 Invalid requests return 400 with detailed error messages:
 
@@ -224,6 +292,8 @@ The `parseTopics()` helper function automatically detects and parses the format,
 
 ## Recent Updates (November 2025)
 
+- **Added slug endpoint validation** with Zod schema to ensure proper slug format (lowercase, hyphens, alphanumeric)
+- **Added GET by slug endpoint** (`GET /api/v1/questions/slug/:slug`) for retrieving questions by URL-friendly identifiers
 - **Migrated to questionsv3 table** with improved schema design
 - **Added multi-language starter code** support (Python, C, C++, Java, JavaScript)
 - **Added slug field** for URL-friendly question identifiers

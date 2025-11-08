@@ -5,6 +5,7 @@ import {
   CreateQuestionSchema,
   UpdateQuestionSchema,
   QuestionIdParamSchema,
+  QuestionSlugParamSchema,
   GetQuestionsQuerySchema,
   GetRandomQuestionQuerySchema
 } from '../validation/schemas';
@@ -69,6 +70,11 @@ export const validateUpdateQuestion = validateRequest(
 
 export const validateQuestionId = validateRequest(
   QuestionIdParamSchema,
+  'params'
+);
+
+export const validateQuestionSlug = validateRequest(
+  QuestionSlugParamSchema,
   'params'
 );
 
