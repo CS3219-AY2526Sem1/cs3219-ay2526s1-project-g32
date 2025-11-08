@@ -153,11 +153,11 @@ export default function AdminPage() {
       setValue('description', response.description);
       setValue('difficulty', response.difficulty as 'Easy' | 'Medium' | 'Hard');
       setValue('topics', response.topics);
-      setValue('starter_python', response.starterCode?.python || '');
-      setValue('starter_c', response.starterCode?.c || '');
-      setValue('starter_cpp', response.starterCode?.cpp || '');
-      setValue('starter_java', response.starterCode?.java || '');
-      setValue('starter_javascript', response.starterCode?.javascript || '');
+      setValue('starter_python', response.starterCode.python || '');
+      setValue('starter_c', response.starterCode.c || '');
+      setValue('starter_cpp', response.starterCode.cpp || '');
+      setValue('starter_java', response.starterCode.java || '');
+      setValue('starter_javascript', response.starterCode.javascript || '');
       
       setCurrentQuestionId(response.id);
       setSuccess(`Question "${response.title}" loaded successfully!`);
