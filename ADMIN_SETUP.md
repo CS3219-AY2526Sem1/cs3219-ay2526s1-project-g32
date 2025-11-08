@@ -2,19 +2,24 @@
 
 ## What Was Created
 
-### 1. **Admin Question Page** (`/admin/questions`)
-   - **Location:** `frontend/app/admin/questions/page.tsx`
+### 1. **Admin Question Management Page** (`/admin`)
+   - **Location:** `frontend/app/admin/page.tsx`
    - **Framework:** Next.js 14 with TypeScript
    - **Form Library:** React Hook Form ✅
    - **UI Components:** Ant Design (matching user service style)
    - **Hot Reloading:** Enabled by default in Next.js dev mode ✅
+   - **Features:**
+     - **Create Mode:** Add new questions to the database
+     - **Edit Mode:** Load and update existing questions by slug or ID
+     - **Delete Mode:** Remove questions with confirmation dialog
 
 ### 2. **API Client Integration**
    - **File:** `frontend/lib/api-client.ts`
    - **Added Functions:**
      - `createQuestion()` - Create new question
      - `getQuestions()` - List questions with filters
-     - `getQuestionById()` - Get single question
+     - `getQuestionById()` - Get single question by ID
+     - `getQuestionBySlug()` - Get single question by slug
      - `updateQuestion()` - Update existing question
      - `deleteQuestion()` - Delete question
      - `getRandomQuestion()` - Get random question by difficulty/topic
@@ -26,6 +31,15 @@
 
 ### 4. **Documentation**
    - **Created:** `frontend/app/admin/README.md` with complete usage guide
+   - **Updated:** Question Service README with new slug endpoint
+
+## Backend API Enhancements
+
+### 5. **Question Service - Get by Slug Endpoint**
+   - **Location:** `question_service/src/controllers/questionController.ts`
+   - **Route:** `GET /api/v1/questions/slug/:slug`
+   - **Purpose:** Fetch questions using human-readable slugs (e.g., "two-sum")
+   - **Benefits:** Better UX for admins when editing/deleting questions
 
 ## How to Use
 
@@ -47,7 +61,9 @@
 
 ### Access the Admin Page:
 
-Navigate to: **http://localhost:3001/admin/questions**
+Navigate to: **http://localhost:3001/admin**
+
+> **Note:** The admin page now includes Create, Edit, and Delete modes accessible via toggle switches.
 
 ## Form Fields
 
@@ -67,6 +83,7 @@ Navigate to: **http://localhost:3001/admin/questions**
 
 ## Features
 
+### Create Mode (Default)
 ✅ **React Hook Form** - Optimized performance, minimal re-renders
 ✅ **Real-time Validation** - Instant feedback on errors
 ✅ **Hot Reloading** - Changes reflect immediately without page refresh
@@ -76,6 +93,20 @@ Navigate to: **http://localhost:3001/admin/questions**
 ✅ **CORS Configured** - Frontend can communicate with Question Service
 ✅ **TypeScript** - Full type safety
 
+### Edit Mode
+✅ **Load by Slug or ID** - Search questions using human-readable slugs (e.g., "two-sum") or numeric IDs
+✅ **Smart Detection** - Automatically detects whether input is slug or ID
+✅ **Form Pre-population** - All fields populated with existing data
+✅ **Partial Updates** - Only modified fields are sent to backend
+✅ **Optional Validation** - All fields optional in edit mode
+
+### Delete Mode
+✅ **Confirmation Dialog** - Warning message: "This action cannot be undone"
+✅ **Load by Slug or ID** - Delete using either identifier
+✅ **Question Verification** - Shows question title before deletion
+✅ **Red Alert Styling** - Visual warning of dangerous operation
+✅ **Success Feedback** - Confirmation with deleted question details
+
 ## File Structure
 
 ```
@@ -83,22 +114,21 @@ frontend/
 ├── app/
 │   └── admin/
 │       ├── README.md
-│       └── questions/
-│           └── page.tsx          # Create question form
+│       └── page.tsx                # Admin question management (Create/Edit/Delete)
 ├── lib/
-│   └── api-client.ts             # Question API functions
-├── .env.local                     # Environment variables
-└── package.json                   # Dependencies (includes react-hook-form)
+│   └── api-client.ts              # Question API functions
+├── .env.local                      # Environment variables
+└── package.json                    # Dependencies (includes react-hook-form)
 
 question_service/
 ├── src/
 │   ├── controllers/
-│   │   └── questionController.ts  # API handlers
+│   │   └── questionController.ts   # API handlers (includes getQuestionBySlug)
 │   ├── routes/
-│   │   └── questionRoutes.ts      # API routes
+│   │   └── questionRoutes.ts       # API routes (includes /slug/:slug)
 │   └── validation/
-│       └── schemas.ts             # Zod validation schemas
-└── .env.example                   # Updated with CORS settings
+│       └── schemas.ts              # Zod validation schemas
+└── .env.example                    # Updated with CORS settings
 ```
 
 ## Testing the Setup
@@ -112,12 +142,15 @@ question_service/
 
 ## Next Steps (Optional Enhancements)
 
-- [ ] Add authentication/authorization (admin role check)
-- [ ] Create question list page with edit/delete
+- [x] Add authentication/authorization (admin role check) ✅
+- [x] Create question edit functionality ✅
+- [x] Create question delete functionality ✅
+- [x] Add slug-based search ✅
 - [ ] Add markdown preview for description
 - [ ] Add code syntax highlighting in starter code inputs
 - [ ] Implement bulk import from CSV/JSON
 - [ ] Add image upload support
+- [ ] Create question list page with pagination
 
 ## Notes
 
