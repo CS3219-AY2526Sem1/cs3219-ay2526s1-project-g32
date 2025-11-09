@@ -76,7 +76,7 @@ const LoadingView = () => (
 
 export default function AdminPage() {
   const router = useRouter();
-  const { user, isAuthenticated, isReady } = useAuth();
+  const { user, session, isAuthenticated, isReady } = useAuth();
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -252,8 +252,7 @@ export default function AdminPage() {
         throw new Error('You must be logged in to perform this action');
       }
 
-      const accessToken = localStorage.getItem('accessToken');
-      if (!accessToken) {
+      if (!session?.accessToken) {
         throw new Error('Authentication token not found. Please log in again.');
       }
 
@@ -269,7 +268,7 @@ export default function AdminPage() {
       }
       
       // Set admin status
-      const result = await setAdminStatusByEmail(targetEmail, true, accessToken);
+      const result = await setAdminStatusByEmail(targetEmail, true, session.accessToken);
       setSuccess(`Successfully granted admin permissions to ${targetEmail} (User: ${result.user.email})`);
       setTargetEmail('');
     } catch (err) {
