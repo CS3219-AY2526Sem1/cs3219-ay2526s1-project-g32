@@ -238,16 +238,8 @@ export default function AdminPage() {
   };
 
   const handleSetAdmin = async () => {
-    // Basic email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    
     if (!targetEmail.trim()) {
       setError('Please enter an email address');
-      return;
-    }
-
-    if (!emailRegex.test(targetEmail)) {
-      setError('Please enter a valid email address');
       return;
     }
 

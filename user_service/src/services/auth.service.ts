@@ -184,15 +184,17 @@ export const getUserByEmail = async (email: string) => {
     throw new HttpError(404, `User with email ${email} not found`);
   }
 
-  return toPublicUser(user);
+  const publicUser = toPublicUser(user);
+  
+  if (!publicUser) {
+    throw new HttpError(500, 'Failed to convert user to public format');
+  }
+
+  return publicUser;
 };
 
 export const updateUserAdminStatusByEmail = async (email: string, isAdmin: boolean) => {
   const user = await getUserByEmail(email);
   
-  if (!user) {
-    throw new HttpError(404, `User with email ${email} not found`);
-  }
-
   return updateUserAdminStatus(user.id, isAdmin);
 };

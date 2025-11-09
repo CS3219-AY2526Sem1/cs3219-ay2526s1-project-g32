@@ -146,10 +146,6 @@ export const setAdminStatusByEmailHandler = async (
   try {
     const { email, isAdmin } = req.body || {};
 
-    if (!email) {
-      throw new HttpError(400, 'Email is required');
-    }
-
     const targetStatus = typeof isAdmin === 'boolean' ? isAdmin : true;
     const user = await updateUserAdminStatusByEmail(email, targetStatus);
 
