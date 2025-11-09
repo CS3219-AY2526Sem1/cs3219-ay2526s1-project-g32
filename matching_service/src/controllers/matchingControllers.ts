@@ -315,10 +315,13 @@ export const acceptExpand = async (req: AuthenticatedRequest, res: Response) => 
     // Define canonical difficulties based on validation enum casing
     const difficulties = ['Easy', 'Medium', 'Hard'];
 
-    // Add the user to all difficulty queues for this topic
+    // Add the user to all difficulty entries for this topic. We allow
+    // duplicate entries (same userId with different difficulty) within the
+    // same topic queue so the matching algorithm can match them against
+    // other users of each difficulty.
     for (const difficulty of difficulties) {
       const entry: QueueEntry = { userId, difficulty, timestamp: Date.now() };
-      await queueService.addToQueue(entry, topic);
+      await queueService.addToQueueAllowDuplicates(entry, topic);
     }
 
     // Cancel the previous final timeout by setting an explicit cancel flag for the stored timeoutId.
