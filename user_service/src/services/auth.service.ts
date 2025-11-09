@@ -172,25 +172,42 @@ export const updateUserAdminStatus = async (userId: string, isAdmin: boolean) =>
 };
 
 export const getUserByEmail = async (email: string) => {
-  const { data, error } = await supabaseAdminClient.auth.admin.listUsers();
-
-  if (error) {
-    throw new HttpError(error.status ?? 400, error.message, error);
-  }
-
-  const user = data.users.find(u => u.email?.toLowerCase() === email.toLowerCase());
-
-  if (!user) {
-    throw new HttpError(404, `User with email ${email} not found`);
-  }
-
-  const publicUser = toPublicUser(user);
+  // Supabase Auth API doesn't provide a direct getUserByEmail method
+  // We need to list users and filter. Loop through all pages to ensure we check all users.
+  let page = 1;
+  const perPage = 1000; // Maximum allowed per page
   
-  if (!publicUser) {
-    throw new HttpError(500, 'Failed to convert user to public format');
+  while (true) {
+    const { data, error } = await supabaseAdminClient.auth.admin.listUsers({
+      page,
+      perPage,
+    });
+
+    if (error) {
+      throw new HttpError(error.status ?? 400, error.message, error);
+    }
+
+    const user = data.users.find(u => u.email?.toLowerCase() === email.toLowerCase());
+
+    if (user) {
+      const publicUser = toPublicUser(user);
+      
+      if (!publicUser) {
+        throw new HttpError(500, 'Failed to convert user to public format');
+      }
+
+      return publicUser;
+    }
+
+    // If we've received fewer users than perPage, we've reached the last page
+    if (data.users.length < perPage) {
+      break;
+    }
+
+    page++;
   }
 
-  return publicUser;
+  throw new HttpError(404, `User with email ${email} not found`);
 };
 
 export const updateUserAdminStatusByEmail = async (email: string, isAdmin: boolean) => {
