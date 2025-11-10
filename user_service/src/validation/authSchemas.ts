@@ -53,3 +53,13 @@ export const setAdminStatusSchema = {
     }),
   }),
 };
+
+export const setAdminStatusByEmailSchema = {
+  body: z.object({
+    email: z.string().email('Valid email is required'),
+    isAdmin: z.boolean({
+      invalid_type_error: 'isAdmin must be a boolean',
+      required_error: 'isAdmin is required',
+    }),
+  }),
+};

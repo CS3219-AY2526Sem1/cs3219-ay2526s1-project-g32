@@ -39,6 +39,7 @@ import {
   getQuestionBySlug,
   updateQuestion,
   deleteQuestion,
+  setAdminStatusByEmail,
   type CreateQuestionPayload 
 } from '../../lib/api-client';
 
@@ -75,15 +76,17 @@ const LoadingView = () => (
 
 export default function AdminPage() {
   const router = useRouter();
-  const { user, isAuthenticated, isReady } = useAuth();
+  const { user, session, isAuthenticated, isReady } = useAuth();
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [isDeleteMode, setIsDeleteMode] = useState(false);
+  const [isSetAdminMode, setIsSetAdminMode] = useState(false);
   const [searchSlug, setSearchSlug] = useState('');
   const [loadingQuestion, setLoadingQuestion] = useState(false);
   const [currentQuestionId, setCurrentQuestionId] = useState<number | null>(null);
+  const [targetEmail, setTargetEmail] = useState('');
 
   const {
     control,
@@ -109,21 +112,37 @@ export default function AdminPage() {
   const handleModeChange = (checked: boolean) => {
     setIsEditMode(checked);
     setIsDeleteMode(false);
+    setIsSetAdminMode(false);
     setError(null);
     setSuccess(null);
     setCurrentQuestionId(null);
     reset();
     setSearchSlug('');
+    setTargetEmail('');
   };
 
   const handleDeleteModeChange = (checked: boolean) => {
     setIsDeleteMode(checked);
     setIsEditMode(false);
+    setIsSetAdminMode(false);
     setError(null);
     setSuccess(null);
     setCurrentQuestionId(null);
     reset();
     setSearchSlug('');
+    setTargetEmail('');
+  };
+
+  const handleSetAdminModeChange = (checked: boolean) => {
+    setIsSetAdminMode(checked);
+    setIsEditMode(false);
+    setIsDeleteMode(false);
+    setError(null);
+    setSuccess(null);
+    setCurrentQuestionId(null);
+    reset();
+    setSearchSlug('');
+    setTargetEmail('');
   };
 
   const handleLoadQuestion = async () => {
@@ -215,6 +234,47 @@ export default function AdminPage() {
       setError(err instanceof Error ? err.message : 'Failed to delete question. Check the slug or ID.');
     } finally {
       setLoadingQuestion(false);
+    }
+  };
+
+  const handleSetAdmin = async () => {
+    if (!targetEmail.trim()) {
+      setError('Please enter an email address');
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      if (!user?.id) {
+        throw new Error('You must be logged in to perform this action');
+      }
+
+      if (!session?.accessToken) {
+        throw new Error('Authentication token not found. Please log in again.');
+      }
+
+      // Show confirmation dialog
+      const confirmed = window.confirm(
+        `Are you sure you want to grant admin permissions to:\n${targetEmail}?\n\n` +
+        `This will give the user full administrative access to the system.`
+      );
+      
+      if (!confirmed) {
+        setLoading(false);
+        return;
+      }
+      
+      // Set admin status
+      const result = await setAdminStatusByEmail(targetEmail, true, session.accessToken);
+      setSuccess(`Successfully granted admin permissions to ${targetEmail} (User: ${result.user.email})`);
+      setTargetEmail('');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to set admin status. Please check the email address.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -336,7 +396,7 @@ export default function AdminPage() {
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <FileTextOutlined style={{ fontSize: 24, color: 'var(--primary-600)' }} />
               <Title level={4} style={{ color: '#fff', margin: 0 }}>
-                PeerPrep Admin - {isDeleteMode ? 'Delete' : isEditMode ? 'Edit' : 'Create'} Question
+                PeerPrep Admin - {isSetAdminMode ? 'Set Admin Permissions' : isDeleteMode ? 'Delete Question' : isEditMode ? 'Edit Question' : 'Create Question'}
               </Title>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
@@ -347,7 +407,7 @@ export default function AdminPage() {
                   onChange={handleModeChange}
                   checkedChildren={<EditOutlined />}
                   unCheckedChildren={<PlusOutlined />}
-                  disabled={isDeleteMode}
+                  disabled={isDeleteMode || isSetAdminMode}
                 />
                 <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13 }}>Edit</span>
               </div>
@@ -358,11 +418,25 @@ export default function AdminPage() {
                   onChange={handleDeleteModeChange}
                   checkedChildren={<DeleteOutlined />}
                   unCheckedChildren={<CloseOutlined />}
+                  disabled={isSetAdminMode}
                   style={{ 
                     background: isDeleteMode ? '#ff4d4f' : undefined 
                   }}
                 />
                 <span style={{ color: isDeleteMode ? '#ff4d4f' : 'rgba(255,255,255,0.7)', fontSize: 13 }}>Delete</span>
+              </div>
+              <Divider type="vertical" style={{ height: 24, background: 'rgba(255,255,255,0.2)' }} />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Switch 
+                  checked={isSetAdminMode} 
+                  onChange={handleSetAdminModeChange}
+                  checkedChildren={<FileTextOutlined />}
+                  unCheckedChildren={<CloseOutlined />}
+                  style={{ 
+                    background: isSetAdminMode ? '#52c41a' : undefined 
+                  }}
+                />
+                <span style={{ color: isSetAdminMode ? '#52c41a' : 'rgba(255,255,255,0.7)', fontSize: 13 }}>Set Admin</span>
               </div>
             </div>
           </div>
@@ -393,8 +467,91 @@ export default function AdminPage() {
               <form onSubmit={handleSubmit(onSubmit)}>
                 <Space direction="vertical" size="large" style={{ width: '100%' }}>
                   
-                  {/* Delete Mode View */}
-                  {isDeleteMode ? (
+                  {/* Set Admin Mode View */}
+                  {isSetAdminMode ? (
+                    <Card 
+                      size="small" 
+                      style={{ 
+                        background: 'rgba(82, 196, 26, 0.1)', 
+                        border: '2px solid rgba(82, 196, 26, 0.4)' 
+                      }}
+                    >
+                      <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                          <FileTextOutlined style={{ fontSize: 24, color: '#52c41a' }} />
+                          <Title level={4} style={{ margin: 0, color: '#52c41a' }}>
+                            Grant Admin Permissions
+                          </Title>
+                        </div>
+                        
+                        <Alert
+                          message="Grant Administrator Access"
+                          description="This will give the specified user full administrative privileges. Make sure you trust this user before granting admin access."
+                          type="info"
+                          showIcon
+                          style={{ 
+                            background: 'rgba(24, 144, 255, 0.1)',
+                            border: '1px solid rgba(24, 144, 255, 0.3)'
+                          }}
+                        />
+
+                        <Divider style={{ margin: '12px 0', borderColor: 'rgba(82, 196, 26, 0.2)' }} />
+
+                        <div>
+                          <Paragraph style={{ marginBottom: 8, color: 'rgba(255,255,255,0.85)' }}>
+                            Enter the user's email address:
+                          </Paragraph>
+                          <Space.Compact style={{ width: '100%' }}>
+                            <Input
+                              size="large"
+                              type="email"
+                              placeholder="user@example.com"
+                              value={targetEmail}
+                              onChange={(e) => setTargetEmail(e.target.value)}
+                              onPressEnter={handleSetAdmin}
+                              disabled={loading}
+                              style={{ borderColor: 'rgba(82, 196, 26, 0.3)' }}
+                            />
+                            <Button
+                              type="primary"
+                              size="large"
+                              icon={<FileTextOutlined />}
+                              onClick={handleSetAdmin}
+                              loading={loading}
+                              style={{ 
+                                background: '#52c41a',
+                                borderColor: '#52c41a'
+                              }}
+                            >
+                              Grant Admin
+                            </Button>
+                          </Space.Compact>
+                        </div>
+
+                        {error && (
+                          <Alert
+                            message="Error"
+                            description={error}
+                            type="error"
+                            showIcon
+                            closable
+                            onClose={() => setError(null)}
+                          />
+                        )}
+                        
+                        {success && (
+                          <Alert
+                            message="Success"
+                            description={success}
+                            type="success"
+                            showIcon
+                            closable
+                            onClose={() => setSuccess(null)}
+                          />
+                        )}
+                      </Space>
+                    </Card>
+                  ) : isDeleteMode ? (
                     <Card 
                       size="small" 
                       style={{ 
