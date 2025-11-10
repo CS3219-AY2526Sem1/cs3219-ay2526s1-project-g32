@@ -1,11 +1,18 @@
 import { z } from 'zod';
 
 const emailField = z.string().email('Valid email required');
+const passwordComplexityField = z
+  .string()
+  .min(8, 'Password must be at least 8 characters long')
+  .regex(
+    /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/,
+    'Password must include uppercase, lowercase, numeric, and symbol characters',
+  );
 
 export const registerSchema = {
   body: z.object({
     email: emailField,
-    password: z.string().min(8, 'Password must be at least 8 characters long'),
+    password: passwordComplexityField,
     username: z.string().min(1, 'Username is required'),
     redirectTo: z.string().url('redirectTo must be a valid URL').optional(),
   }),

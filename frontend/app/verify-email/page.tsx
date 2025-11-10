@@ -81,10 +81,30 @@ export default function VerifyEmailPage() {
 
             <Space direction="vertical" style={{ width: '100%' }} size="middle">
               {message ? (
-                <Alert type="success" showIcon message={message} />
+                <Alert
+                  type="success"
+                  showIcon
+                  message={message}
+                  style={{
+                    background: '#132a13',
+                    borderColor: '#52c41a',
+                    color: '#e8ffe8',
+                    width: '100%',
+                  }}
+                />
               ) : null}
               {error ? (
-                <Alert type="error" showIcon message={error} />
+                <Alert
+                  type="error"
+                  showIcon
+                  message={error}
+                  style={{
+                    background: '#2a1517',
+                    borderColor: '#ff4d4f',
+                    color: '#fff1f0',
+                    width: '100%',
+                  }}
+                />
               ) : null}
 
               <Button
