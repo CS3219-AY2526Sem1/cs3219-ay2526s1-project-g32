@@ -79,6 +79,14 @@ export const QuestionIdParamSchema = z.object({
   id: z.string().regex(/^\d+$/, 'ID must be a positive number').transform(Number),
 });
 
+// Slug parameter schema
+export const QuestionSlugParamSchema = z.object({
+  slug: z.string()
+    .min(1, 'Slug is required')
+    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'Slug must be lowercase alphanumeric with hyphens only (e.g., two-sum, reverse-linked-list)')
+    .max(100, 'Slug cannot exceed 100 characters'),
+});
+
 // Environment variables schema
 export const EnvSchema = z.object({
   SUPABASE_URL: z.string().url('Invalid Supabase URL'),
@@ -93,4 +101,5 @@ export type UpdateQuestionInput = z.infer<typeof UpdateQuestionSchema>;
 export type GetQuestionsQuery = z.infer<typeof GetQuestionsQuerySchema>;
 export type GetRandomQuestionQuery = z.infer<typeof GetRandomQuestionQuerySchema>;
 export type QuestionIdParam = z.infer<typeof QuestionIdParamSchema>;
+export type QuestionSlugParam = z.infer<typeof QuestionSlugParamSchema>;
 export type Difficulty = z.infer<typeof DifficultySchema>;

@@ -7,6 +7,7 @@ import {
   resendVerificationHandler,
   validateTokenHandler,
   setAdminStatusHandler,
+  setAdminStatusByEmailHandler,
 } from '../controllers/auth.controller';
 import { authenticate } from '../middleware/authenticate';
 import { requireAdmin } from '../middleware/requireAdmin';
@@ -17,6 +18,7 @@ import {
   sendMagicLinkSchema,
   validateTokenSchema,
   setAdminStatusSchema,
+  setAdminStatusByEmailSchema,
 } from '../validation/authSchemas';
 
 const router = Router();
@@ -32,6 +34,13 @@ router.patch(
   requireAdmin,
   validateRequest(setAdminStatusSchema),
   setAdminStatusHandler,
+);
+router.patch(
+  '/admin/set-by-email',
+  authenticate,
+  requireAdmin,
+  validateRequest(setAdminStatusByEmailSchema),
+  setAdminStatusByEmailHandler,
 );
 
 export const authRouter = router;

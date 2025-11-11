@@ -7,6 +7,7 @@ import {
   registerUser,
   sendMagicLink,
   updateUserAdminStatus,
+  updateUserAdminStatusByEmail,
 } from '../services/auth.service';
 import type { AuthenticatedRequest } from '../middleware/authenticate';
 import { HttpError } from '../utils/httpError';
@@ -130,6 +131,23 @@ export const setAdminStatusHandler = async (
 
     const targetStatus = typeof isAdmin === 'boolean' ? isAdmin : true;
     const user = await updateUserAdminStatus(userId, targetStatus);
+
+    res.status(200).json({ user });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const setAdminStatusByEmailHandler = async (
+  req: Request<unknown, unknown, { email: string; isAdmin?: boolean }>,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const { email, isAdmin } = req.body || {};
+
+    const targetStatus = typeof isAdmin === 'boolean' ? isAdmin : true;
+    const user = await updateUserAdminStatusByEmail(email, targetStatus);
 
     res.status(200).json({ user });
   } catch (error) {

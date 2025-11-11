@@ -60,6 +60,7 @@ export default function MatchingPage() {
   const [isMatching, setIsMatching] = useState(false);
   const [pollInterval, setPollInterval] = useState<NodeJS.Timeout | null>(null);
   const [showExpandModal, setShowExpandModal] = useState(false);
+  const [expandDeclined, setExpandDeclined] = useState(false);
   const router = useRouter();
   const displayName =
     typeof user?.userMetadata?.username === 'string' && user.userMetadata.username.trim().length > 0
@@ -82,18 +83,21 @@ export default function MatchingPage() {
             message.info('No active match request found');
             setIsMatching(false);
           }
-          // If backend sets prompt flag, show expand modal
-          if (status.prompt) {
+
+          // If backend sets prompt flag, show expand modal unless user already declined
+          if (status.prompt && !expandDeclined) {
             setShowExpandModal(true);
           }
         } catch (error) {
           console.error('Error polling match status:', error);
         }
-      }, 2000); // Poll every 2 seconds
+  }, 2000); // Poll every 2 seconds
+
       setPollInterval(interval);
       return () => clearInterval(interval);
     }
-  }, [isMatching, router, session, user]);
+  }, [isMatching, router, session, user, expandDeclined]);
+  
   if (!isReady) {
     return (
       <ConfigProvider theme={peerPrepTheme}>
@@ -116,6 +120,8 @@ export default function MatchingPage() {
       return;
     }
     setIsMatching(true);
+  // Reset decline state for a fresh matching attempt
+  setExpandDeclined(false);
     
     try {
       const response = await startMatchmaking(
@@ -153,10 +159,13 @@ export default function MatchingPage() {
         await cancelMatch(selectedTopic, session.accessToken);
       }
       setIsMatching(false);
+      // reset decline state when user explicitly cancels
+      setExpandDeclined(false);
       message.info('Matchmaking cancelled');
     } catch (error) {
       console.error('Error cancelling match:', error);
       setIsMatching(false);
+      setExpandDeclined(false);
       message.info('Matchmaking cancelled');
     }
   };
@@ -166,6 +175,8 @@ export default function MatchingPage() {
         await acceptExpand(selectedTopic, session.accessToken);
         message.success('Search expanded to all difficulties.');
         setShowExpandModal(false);
+        // reset any decline state after accepting
+        setExpandDeclined(false);
       }
     } catch (error) {
       console.error('Error accepting expand:', error);
@@ -382,7 +393,11 @@ export default function MatchingPage() {
           title="Expand search to more difficulties?"
           open={showExpandModal}
           onOk={handleAcceptExpand}
-          onCancel={() => setShowExpandModal(false)}
+          onCancel={() => {
+            // User explicitly declined or closed the modal. Remember this choice
+            setShowExpandModal(false);
+            setExpandDeclined(true);
+          }}
           okText="Yes, expand"
           cancelText="No"
         >

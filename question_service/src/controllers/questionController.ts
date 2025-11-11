@@ -135,6 +135,50 @@ export const getQuestionById = async (req: Request, res: Response): Promise<void
   }
 };
 
+// Get a single question by slug
+export const getQuestionBySlug = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { slug } = req.params;
+    
+    logger.info({ slug }, '[GET /slug/:slug] Fetching question by slug');
+    
+    const { data, error } = await supabase
+      .from('questionsv3')
+      .select('*')
+      .eq('slug', slug)
+      .single();
+    
+    if (error || !data) {
+      logger.warn({ slug, error }, '[GET /slug/:slug] Question not found');
+      res.status(404).json({ error: "Question not found" });
+      return;
+    }
+    
+    const question = {
+      id: data.id,
+      title: data.title,
+      slug: data.slug,
+      description: data.description,
+      difficulty: data.difficulty,
+      topics: parseTopics(data.topics),
+      starterCode: {
+        python: data.starter_python,
+        c: data.starter_c,
+        cpp: data.starter_cpp,
+        java: data.starter_java,
+        javascript: data.starter_javascript
+      }
+    };
+    
+    logger.info({ questionId: data.id, slug }, '[GET /slug/:slug] Question found');
+    res.json(question);
+  } catch (err) {
+    const error = err as Error;
+    logger.error({ error: error.message, stack: error.stack }, '[GET /slug/:slug] Error');
+    res.status(500).json({ error: error.message });
+  }
+};
+
 // Update a question
 export const updateQuestion = async (req: Request, res: Response): Promise<void> => {
   try {

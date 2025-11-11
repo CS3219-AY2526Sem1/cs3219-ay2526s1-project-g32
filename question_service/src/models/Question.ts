@@ -96,13 +96,31 @@ export class QuestionService {
 
   // Create new question
   static async create(attributes: QuestionCreationAttributes): Promise<QuestionAttributes> {
+    // Get the maximum ID and add 1 to generate the next ID
+    const { data: maxData, error: maxError } = await supabase
+      .from(this.tableName)
+      .select('id')
+      .order('id', { ascending: false })
+      .limit(1)
+      .single();
+
+    if (maxError && maxError.code !== 'PGRST116') {
+      throw maxError;
+    }
+
+    const nextId = maxData ? maxData.id + 1 : 1;
+    console.log('Creating question with nextId:', nextId, 'attributes:', attributes);
+
     const { data, error } = await supabase
       .from(this.tableName)
-      .insert([attributes])
+      .insert([{ id: nextId, ...attributes }])
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error('Insert error:', error);
+      throw error;
+    }
     return this.mapRowToAttributes(data);
   }
 
