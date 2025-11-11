@@ -65,6 +65,23 @@ class QueueService {
   }
 
   /**
+   * Adds a user to the end of the queue for a specific topic without
+   * removing any existing entries for that user in the same topic queue.
+   * This is useful when a user should appear multiple times with different
+   * difficulty preferences (e.g., after accepting an "expand" action).
+   */
+  public async addToQueueAllowDuplicates(entry: QueueEntry, topic: string): Promise<void> {
+    const queueKey = getQueueKey(topic);
+    try {
+      await redisClient.rPush(queueKey, JSON.stringify(entry));
+      console.log(`User ${entry.userId} (allow-duplicates) added to queue for topic: ${topic}`);
+    } catch (err) {
+      console.error(`[QueueService] Failed to add (allow-duplicates) user ${entry.userId} to ${queueKey}:`, err);
+      throw err;
+    }
+  }
+
+  /**
    * Removes all occurrences of a user from all topic queues.
    * Returns the total number of list entries removed across all queues.
    * This is used after a successful match to ensure the matched user does not
