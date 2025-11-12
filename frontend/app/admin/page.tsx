@@ -524,7 +524,7 @@ export default function AdminPage() {
 
                         <div>
                           <Paragraph style={{ marginBottom: 8, color: 'rgba(255,255,255,0.85)' }}>
-                            Enter the user's email address:
+                            Enter the user&rsquo;s email address:
                           </Paragraph>
                           <Space.Compact style={{ width: '100%' }}>
                             <Input
