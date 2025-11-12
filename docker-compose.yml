@@ -5,6 +5,11 @@ services:
     image: redis:7-alpine
     ports:
       - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   rabbitmq:
     image: rabbitmq:3-management
@@ -14,7 +19,11 @@ services:
     ports:
       - "5672:5672"
       - "15672:15672"
-
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
   user:
     build: ./user_service
     env_file:
@@ -43,15 +52,16 @@ services:
     build: ./matching_service
     ports:
       - "3002:3002"
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     environment:
-      - PORT=3002
       - RABBITMQ_URL=amqp://rabbitmq:5672
       - REDIS_URL=redis://redis:6379
       - USER_SERVICE_URL=http://user:4001
       - COLLABORATION_SERVICE_URL=http://collaboration:4010/api/v1/sessions
-    depends_on:
-      - rabbitmq
-      - redis
     healthcheck:
       test: ["CMD-SHELL", "node -e 'const http=require(\"http\");http.get(\"http://localhost:3002/\",r=>process.exit(r.statusCode>=200&&r.statusCode<400?0:1))'" ]
       interval: 30s
@@ -64,10 +74,15 @@ services:
       - ./collaboration_service/.env
     ports:
       - "4010:4010"
+    environment:
+      - REDIS_URL=redis://redis:6379
     depends_on:
-      - redis
-      - question
-      - user
+      redis:
+        condition: service_healthy
+      question:
+        condition: service_started
+      user:
+        condition: service_started
     healthcheck:
       test: ["CMD-SHELL", "node -e 'const http=require(\"http\");http.get(\"http://localhost:4010/\",r=>process.exit(r.statusCode>=200&&r.statusCode<400?0:1))'" ]
       interval: 30s
