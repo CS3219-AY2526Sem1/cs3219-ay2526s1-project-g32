@@ -20,7 +20,7 @@ async function createCollaborationSession(
   user2DisplayName: string | undefined,
   difficulty: string,
   topic: string,
-) {
+): Promise<any | null> {
   try {
     // Generate a unique match ID for this session
     const matchId = `match-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
@@ -64,11 +64,54 @@ async function createCollaborationSession(
 
     console.error('[Controller] Error calling Collaboration Service:', errorMessage);
     
-    // CRITICAL: Re-queue both users if the collaboration service fails.
-    await queueService.addToFrontOfQueue({ userId: user1Id, difficulty, timestamp: Date.now() }, topic);
-    await queueService.addToFrontOfQueue({ userId: user2Id, difficulty, timestamp: Date.now() }, topic);
-    console.log(`[Controller] Re-queued users ${user1Id} and ${user2Id} due to collaboration service error: ${errorMessage}`);
-    throw new Error('Failed to create collaboration session.');
+    // CRITICAL: Attempt to re-queue both users if the collaboration service fails.
+    // Use best-effort approach: try to add both users and schedule timeout checks
+    // even if one of the operations fails so we don't drop a user from matchmaking.
+    const entryA = { userId: user1Id, difficulty, timestamp: Date.now() } as QueueEntry;
+    const entryB = { userId: user2Id, difficulty, timestamp: Date.now() } as QueueEntry;
+
+    try {
+      await queueService.addToFrontOfQueue(entryA, topic);
+      try {
+        // schedule a timeout check so the frontend will get prompts and final cleanup
+        timeoutService.scheduleTimeoutCheck(entryA);
+      } catch (tErr) {
+        console.warn('[Controller] Failed to schedule timeout for re-queued user', user1Id, tErr);
+      }
+    } catch (qErr) {
+      console.error('[Controller] Failed to re-queue user1 after collaboration service error:', qErr);
+    }
+
+    try {
+      await queueService.addToFrontOfQueue(entryB, topic);
+      try {
+        timeoutService.scheduleTimeoutCheck(entryB);
+      } catch (tErr) {
+        console.warn('[Controller] Failed to schedule timeout for re-queued user', user2Id, tErr);
+      }
+    } catch (qErr) {
+      console.error('[Controller] Failed to re-queue user2 after collaboration service error:', qErr);
+    }
+
+    // Ensure both users have their match_status set back to 'pending' so the
+    // frontend and timeout consumer treat them as active requests.
+    try {
+      await redisClient.set(`match_status:${user1Id}`, 'pending');
+      await redisClient.del(`match_session:${user1Id}`);
+    } catch (sErr) {
+      console.warn('[Controller] Failed to reset match_status for user', user1Id, sErr);
+    }
+
+    try {
+      await redisClient.set(`match_status:${user2Id}`, 'pending');
+      await redisClient.del(`match_session:${user2Id}`);
+    } catch (sErr) {
+      console.warn('[Controller] Failed to reset match_status for user', user2Id, sErr);
+    }
+
+    console.log(`[Controller] Re-queued users ${user1Id} and ${user2Id} (best-effort) due to collaboration service error: ${errorMessage}`);
+    // Return null to indicate session creation failed but re-queue recovery was attempted.
+    return null;
   }
 }
 
@@ -101,6 +144,14 @@ export const createMatchRequest = async (req: AuthenticatedRequest, res: Respons
         difficulty,
         topic,
       );
+
+      // If session creation failed but recovery (re-queue) was attempted,
+      // createCollaborationSession returns null. In that case, return a
+      // pending response so the client knows they were re-queued.
+      if (session === null) {
+        console.warn('[Controller] Collaboration service creation failed; users were re-queued (best-effort).');
+        return res.status(202).json({ status: 'pending', message: 'Temporary failure creating collaboration session; you have been re-queued.' });
+      }
 
       // Persist the sessionId for both users so polling clients can retrieve it.
       // Set a TTL to avoid stale keys lingering in Redis.
@@ -322,6 +373,76 @@ export const acceptExpand = async (req: AuthenticatedRequest, res: Response) => 
     for (const difficulty of difficulties) {
       const entry: QueueEntry = { userId, difficulty, timestamp: Date.now() };
       await queueService.addToQueueAllowDuplicates(entry, topic);
+    }
+
+    // Immediately attempt to match the expanding user against existing
+    // entries in each difficulty queue (excluding self) so they can be
+    // paired right away if someone is already waiting.
+    for (const difficulty of difficulties) {
+      try {
+        const matchedUser = await queueService.findMatchInQueueExcluding(difficulty, topic, userId);
+        if (matchedUser) {
+          console.log(`[Controller] Immediate match found for expanding user ${userId} at difficulty ${difficulty} with ${matchedUser.userId}.`);
+
+          // Create collaboration session using same helper as createMatchRequest
+          const resolvedDisplayName = req.user?.displayName?.trim() || userId;
+          const session = await createCollaborationSession(
+            userId,
+            resolvedDisplayName,
+            matchedUser.userId,
+            matchedUser.displayName,
+            difficulty,
+            topic,
+          );
+
+          // Persist sessionId for both users
+          const sessionKeyA = `match_session:${userId}`;
+          const sessionKeyB = `match_session:${matchedUser.userId}`;
+          await redisClient.set(sessionKeyA, session.sessionId);
+          await redisClient.set(sessionKeyB, session.sessionId);
+          await redisClient.expire(sessionKeyA, 300);
+          await redisClient.expire(sessionKeyB, 300);
+
+          // Set status to success for both users
+          await redisClient.set(`match_status:${userId}`, 'success');
+          await redisClient.set(`match_status:${matchedUser.userId}`, 'success');
+
+          // Ensure they are removed from all queues
+          try {
+            await queueService.removeUserFromAllQueues(userId);
+          } catch (err) {
+            console.warn('[Controller] Failed to remove leftover queue entries for user', userId, err);
+          }
+          try {
+            await queueService.removeUserFromAllQueues(matchedUser.userId);
+          } catch (err) {
+            console.warn('[Controller] Failed to remove leftover queue entries for matched user', matchedUser.userId, err);
+          }
+
+          // Cancel timeouts and prompts for both users
+          const cancelCleanupFor = async (uid: string) => {
+            try {
+              const prevTimeoutId = await redisClient.get(`match_timeout_id:${uid}`);
+              if (prevTimeoutId) {
+                await redisClient.set(`match_timeout_cancel:${prevTimeoutId}`, 'true');
+                await redisClient.expire(`match_timeout_cancel:${prevTimeoutId}`, 120);
+              }
+              await redisClient.del(`match_prompt:${uid}`);
+              await redisClient.del(`match_timeout_id:${uid}`);
+            } catch (err) {
+              console.warn('[Controller] Could not cancel timeout/clear prompt for', uid, err);
+            }
+          };
+
+          await cancelCleanupFor(userId);
+          await cancelCleanupFor(matchedUser.userId);
+
+          return res.status(200).json({ status: 'success', message: 'Match found (expand)!', sessionId: session.sessionId, matchedWith: matchedUser.userId });
+        }
+      } catch (err) {
+        console.warn('[Controller] Error attempting immediate match during expand for', userId, err);
+        // continue to next difficulty
+      }
     }
 
     // Cancel the previous final timeout by setting an explicit cancel flag for the stored timeoutId.

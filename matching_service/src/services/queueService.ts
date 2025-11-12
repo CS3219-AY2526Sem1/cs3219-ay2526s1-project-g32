@@ -158,6 +158,43 @@ class QueueService {
     // No match was found in the queue.
     return null;
   }
+
+  /**
+   * Searches a topic queue for a user with a matching difficulty but excludes
+   * a specific userId from being matched (prevents self-matching when the same
+   * user has multiple entries in the queue after expand).
+   * If a match is found, it atomically removes the matched user from the queue.
+   * @param difficulty - The difficulty to match.
+   * @param topic - The topic queue to search in.
+   * @param excludeUserId - A userId to exclude from matching (usually the requester).
+   * @returns The matched user's data, or null if no match is found.
+   */
+  public async findMatchInQueueExcluding(difficulty: string, topic: string, excludeUserId: string): Promise<QueueEntry | null> {
+    const queueKey = getQueueKey(topic);
+    // Get all users currently in the queue for this topic.
+    const queueEntries = await redisClient.lRange(queueKey, 0, -1);
+
+    for (let i = 0; i < queueEntries.length; i++) {
+      const entryString = queueEntries[i];
+      const entry: QueueEntry = JSON.parse(entryString);
+
+      // Skip entries that belong to the excluded user
+      if (entry.userId === excludeUserId) continue;
+
+      if (entry.difficulty === difficulty) {
+        // Match found! Atomically remove this specific entry from the list.
+        await redisClient.lRem(queueKey, 1, entryString);
+        console.log(`Match found for difficulty '${difficulty}' in topic '${topic}'. Matched with user ${entry.userId}.`);
+        return {
+          ...entry,
+          displayName: typeof entry.displayName === 'string' ? entry.displayName : undefined,
+        };
+      }
+    }
+
+    // No match was found in the queue.
+    return null;
+  }
   
   /**
    * Adds a user to the front of the queue for a specific topic.
