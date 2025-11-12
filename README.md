@@ -63,3 +63,23 @@ PeerPrep is a collaborative coding platform composed of multiple services. Each 
 ```
 
 Refer to each service-specific README for detailed capabilities, environment variables, and API references.
+
+## Containerisation
+
+Each service ships with its own `Dockerfile` and `.dockerignore`. The repo includes:
+- `docker-compose.yml` – builds production-style images for every service plus Redis/RabbitMQ
+- `docker-compose.override.yml` – mounts source folders and runs `npm run dev` for hot reload during local development
+- `.env.example` files per service documenting required variables
+
+### Development
+```bash
+cp <service>/.env.example <service>/.env    # fill in Supabase secrets, etc.
+docker compose up --build
+```
+The override file mounts your source tree so changes trigger the dev servers automatically.
+
+### Production-style
+```bash
+docker compose -f docker-compose.yml up --build -d
+```
+This uses the production builds produced by each Dockerfile. Stop containers with `docker compose down`.

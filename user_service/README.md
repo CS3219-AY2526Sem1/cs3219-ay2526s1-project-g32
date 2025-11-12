@@ -51,3 +51,30 @@ The dev server listens on `http://localhost:4001`. Use `npm run build --workspac
 - `PATCH /api/v1/auth/users/:userId/admin` – mark/unmark admin (requires admin auth)
 
 All routes use JSON responses. See `src/routes/auth.route.ts` for full list and payload schemas in `src/validation/authSchemas.ts`.
+
+## Admin Question Management
+The frontend includes an `/admin` dashboard which relies on the user service’s admin flag and the question service APIs.
+
+- **Location:** `frontend/app/admin/page.tsx`
+- **Features:** create, edit, and delete questions (load by slug or ID), with Ant Design UI and React Hook Form validation.
+- **Supporting API Clients:** `frontend/lib/api-client.ts` exposes `createQuestion`, `updateQuestion`, `deleteQuestion`, `getQuestionBySlug`, etc.
+
+### Using the Admin Page
+1. Ensure the following services are running (via Docker Compose or individually):
+   - `question_service` on `http://localhost:4003`
+   - `frontend` on `http://localhost:3000`
+   - `user_service` (for admin authentication)
+2. Promote at least one account to admin via:
+   ```bash
+   curl -X PATCH \
+     -H "Authorization: Bearer <admin_access_token>" \
+     -H "Content-Type: application/json" \
+     -d '{"isAdmin": true}' \
+     http://localhost:4001/api/v1/auth/users/<userId>/admin
+   ```
+3. Sign in with that account and visit `http://localhost:3000/admin`.
+
+### Question Service Integration
+- Requires `NEXT_PUBLIC_QUESTION_SERVICE_URL` in the frontend `.env` (default `http://localhost:4003/api/v1/questions`).
+- Question service exposes `GET /api/v1/questions/slug/:slug` for edit/delete flows.
+- Starter-code fields exist for Python, JavaScript, Java, C++, and C.
