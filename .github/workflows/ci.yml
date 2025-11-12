@@ -8,7 +8,7 @@ on:
 
 jobs:
   service-check:
-    name: Build & test: ${{ matrix.service.name }}
+    name: "Build & test: ${{ matrix.service.name }}"
     runs-on: ubuntu-latest
     strategy:
       matrix:
