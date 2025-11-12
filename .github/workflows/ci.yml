@@ -35,7 +35,7 @@ jobs:
           path: |
             ${{ matrix.service.path }}/node_modules
             ~/.npm
-          key: ${{ runner.os }}-node-${{ matrix.service.name }}-${{ hashFiles(matrix.service.path + '/package-lock.json') }}
+          key: ${{ runner.os }}-node-${{ matrix.service.name }}-${{ hashFiles(format('{0}/package-lock.json', matrix.service.path)) }}
           restore-keys: |
             ${{ runner.os }}-node-${{ matrix.service.name }}-
 
