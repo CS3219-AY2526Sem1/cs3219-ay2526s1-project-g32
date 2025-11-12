@@ -51,34 +51,10 @@ const deserializeState = (value: string | null): Omit<AuthState, 'isReady'> => {
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [state, setState] = useState<AuthState>(defaultState);
 
-  useEffect(() => {
-    const restored = deserializeState(typeof window !== 'undefined' ? localStorage.getItem(STORAGE_KEY) : null);
-    setState({ ...restored, isReady: true });
+  const logout = useCallback(() => {
+    localStorage.removeItem(STORAGE_KEY);
+    setState({ user: null, session: null, isReady: true });
   }, []);
-
-  useEffect(() => {
-    if (!state.isReady) return;
-
-    const payload = serializeState({ user: state.user, session: state.session });
-    localStorage.setItem(STORAGE_KEY, payload);
-  }, [state.isReady, state.session, state.user]);
-
-  useEffect(() => {
-    const syncUser = async () => {
-      if (!state.isReady || !state.session || state.user) {
-        return;
-      }
-
-      try {
-        const response = await fetchMe(state.session.accessToken);
-        setState((current) => ({ ...current, user: response.user }));
-      } catch (error) {
-        console.warn('Failed to refresh user from token', error);
-      }
-    };
-
-    void syncUser();
-  }, [state.isReady, state.session, state.user]);
 
   const login = useCallback((payload: LoginResponse) => {
     setState({
@@ -93,10 +69,35 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
   }, []);
 
-  const logout = useCallback(() => {
-    localStorage.removeItem(STORAGE_KEY);
-    setState({ user: null, session: null, isReady: true });
+  useEffect(() => {
+    const restored = deserializeState(typeof window !== 'undefined' ? localStorage.getItem(STORAGE_KEY) : null);
+    setState({ ...restored, isReady: true });
   }, []);
+
+  useEffect(() => {
+    if (!state.isReady) return;
+
+    const payload = serializeState({ user: state.user, session: state.session });
+    localStorage.setItem(STORAGE_KEY, payload);
+  }, [state.isReady, state.session, state.user]);
+
+  useEffect(() => {
+    const syncUser = async () => {
+      if (!state.isReady || !state.session) {
+        return;
+      }
+
+      try {
+        const response = await fetchMe(state.session.accessToken);
+        setState((current) => ({ ...current, user: response.user }));
+      } catch (error) {
+        console.warn('Failed to refresh user from token', error);
+        logout();
+      }
+    };
+
+    void syncUser();
+  }, [logout, state.isReady, state.session]);
 
   const value = useMemo<AuthContextValue>(
     () => ({

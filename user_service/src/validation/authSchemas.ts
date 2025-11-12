@@ -70,3 +70,9 @@ export const setAdminStatusByEmailSchema = {
     }),
   }),
 };
+
+export const updatePasswordSchema = {
+  body: z.object({
+    password: passwordComplexityField,
+  }),
+};

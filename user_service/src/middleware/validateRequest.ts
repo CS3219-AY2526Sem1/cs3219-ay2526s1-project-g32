@@ -28,10 +28,12 @@ export const validateRequest = (schemas: SchemaGroup) =>
     } catch (error) {
       if (error instanceof ZodError) {
         const formatted = error.flatten();
-        next(new HttpError(400, 'Validation failed', formatted.fieldErrors));
+        const primaryMessage = error.issues[0]?.message ?? 'Validation failed';
+        next(new HttpError(400, primaryMessage, formatted.fieldErrors));
         return;
       }
 
       next(error);
     }
   };
+

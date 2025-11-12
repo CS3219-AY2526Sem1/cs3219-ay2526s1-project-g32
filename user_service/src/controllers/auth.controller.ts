@@ -8,6 +8,7 @@ import {
   sendMagicLink,
   updateUserAdminStatus,
   updateUserAdminStatusByEmail,
+  updateUserPassword,
 } from '../services/auth.service';
 import type { AuthenticatedRequest } from '../middleware/authenticate';
 import { HttpError } from '../utils/httpError';
@@ -150,6 +151,25 @@ export const setAdminStatusByEmailHandler = async (
     const user = await updateUserAdminStatusByEmail(email, targetStatus);
 
     res.status(200).json({ user });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const updatePasswordHandler = async (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    if (!req.auth) {
+      throw new HttpError(401, 'Authentication required');
+    }
+
+    const { password } = req.body as { password: string };
+    await updateUserPassword(req.auth.userId, password);
+
+    res.status(204).send();
   } catch (error) {
     next(error);
   }

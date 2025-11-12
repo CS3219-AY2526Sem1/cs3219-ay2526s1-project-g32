@@ -3,13 +3,13 @@
 import { useEffect, useState } from "react";
 import type { Route } from "next";
 import { useRouter } from "next/navigation";
-import { Button, Card, Col, ConfigProvider, Layout, List, Row, Space, Typography } from "antd";
+import { Button, Card, Col, ConfigProvider, Input, Layout, List, Modal, Row, Space, Typography } from "antd";
 
 import { useAuth } from "../../hooks/useAuth";
 import { useRequireAuth } from "../../hooks/useRequireAuth";
 import { peerPrepTheme } from "../../lib/theme";
 import { fetchActiveSessionForUser, type ActiveSessionResponse } from "../../lib/collab-client";
-import { fetchUserHistory, fetchSessionAttemptDetail } from "../../lib/api-client";
+import { fetchUserHistory, fetchSessionAttemptDetail, updatePassword } from "../../lib/api-client";
 
 const { Header, Content } = Layout;
 const { Title, Text } = Typography;
@@ -33,7 +33,62 @@ export default function DashboardPage() {
   const [historyItems, setHistoryItems] = useState<HistoryListItem[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
+  const [passwordModalOpen, setPasswordModalOpen] = useState(false);
+  const [passwordInput, setPasswordInput] = useState("");
+  const [passwordConfirm, setPasswordConfirm] = useState("");
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [passwordSuccess, setPasswordSuccess] = useState<string | null>(null);
+  const [passwordSaving, setPasswordSaving] = useState(false);
 
+  const openPasswordModal = () => {
+    setPasswordInput("");
+    setPasswordConfirm("");
+    setPasswordError(null);
+    setPasswordSuccess(null);
+    setPasswordModalOpen(true);
+  };
+
+  const closePasswordModal = () => {
+    if (!passwordSaving) {
+      setPasswordModalOpen(false);
+    }
+  };
+
+  const handlePasswordUpdate = async () => {
+    if (!accessToken) {
+      setPasswordError("You must be signed in.");
+      return;
+    }
+
+    if (!passwordInput || !passwordConfirm) {
+      setPasswordError("Please fill in both password fields.");
+      return;
+    }
+
+    if (passwordInput !== passwordConfirm) {
+      setPasswordError("Passwords do not match.");
+      return;
+    }
+
+    setPasswordError(null);
+    setPasswordSuccess(null);
+    setPasswordSaving(true);
+
+    try {
+      await updatePassword(passwordInput, accessToken);
+      setPasswordSuccess("Password updated successfully.");
+      setPasswordInput("");
+      setPasswordConfirm("");
+    } catch (error) {
+      if (error instanceof Error) {
+        setPasswordError(error.message);
+      } else {
+        setPasswordError("Unable to update password. Please try again.");
+      }
+    } finally {
+      setPasswordSaving(false);
+    }
+  };
   useEffect(() => {
     if (!isReady || !userId || !accessToken) {
       setActiveSession(null);
@@ -294,24 +349,25 @@ export default function DashboardPage() {
 
               <Row gutter={[24, 24]}>
                 <Col xs={24} md={12}>
-                  <Card
-                    className="dark-card"
-                    title="Your account"
-                    bordered
-                    headStyle={{ padding: "16px 24px" }}
-                    bodyStyle={{ padding: "24px" }}
-                  >
-                    <Space direction="vertical">
-                      <Text style={{ color: "var(--muted)" }}>Username: {username}</Text>
-                      <Text style={{ color: "var(--muted)" }}>Email: {user?.email ?? "Unknown"}</Text>
-                      <Text style={{ color: "var(--muted)" }}>
-                        Email verified: {user?.emailConfirmed ? "Yes" : "Pending verification"}
-                      </Text>
-                      <Text style={{ color: "var(--muted)" }}>
-                        Created: {user ? new Date(user.createdAt).toLocaleString() : "-"}
-                      </Text>
-                    </Space>
-                  </Card>
+                <Card
+                  className="dark-card"
+                  title="Your account"
+                  bordered
+                  headStyle={{ padding: "16px 24px" }}
+                  bodyStyle={{ padding: "24px" }}
+                >
+                  <Space direction="vertical" size="large">
+                    <Text style={{ color: "var(--muted)" }}>Username: {username}</Text>
+                    <Text style={{ color: "var(--muted)" }}>Email: {user?.email ?? "Unknown"}</Text>
+                    <Button
+                      type="primary"
+                      style={{ backgroundColor: "#8B5CF6", borderColor: "#8B5CF6" }}
+                      onClick={openPasswordModal}
+                    >
+                      Change your password
+                    </Button>
+                  </Space>
+                </Card>
                 </Col>
                 <Col xs={24} md={12}>
                   <Card
@@ -385,6 +441,54 @@ export default function DashboardPage() {
           </div>
         </Content>
       </Layout>
+
+      <Modal
+        title="Change your password"
+        open={passwordModalOpen}
+        onCancel={closePasswordModal}
+        footer={[
+          <Button key="cancel" onClick={closePasswordModal} disabled={passwordSaving}>
+            Cancel
+          </Button>,
+          <Button
+            key="save"
+            type="primary"
+            loading={passwordSaving}
+            onClick={handlePasswordUpdate}
+            style={{ backgroundColor: "#8B5CF6", borderColor: "#8B5CF6" }}
+          >
+            Update password
+          </Button>,
+        ]}
+      >
+        <Space direction="vertical" size="middle" style={{ width: "100%" }}>
+          <Input.Password
+            placeholder="Enter new password"
+            value={passwordInput}
+            onChange={(event) => {
+              setPasswordInput(event.target.value);
+              setPasswordError(null);
+              setPasswordSuccess(null);
+            }}
+          />
+          <Input.Password
+            placeholder="Re-enter new password"
+            value={passwordConfirm}
+            onChange={(event) => {
+              setPasswordConfirm(event.target.value);
+              setPasswordError(null);
+              setPasswordSuccess(null);
+            }}
+          />
+          {passwordError && (
+            <Text style={{ color: "#ff7875" }}>{passwordError}</Text>
+          )}
+          {passwordSuccess && (
+            <Text style={{ color: "#52c41a" }}>{passwordSuccess}</Text>
+          )}
+        </Space>
+      </Modal>
     </ConfigProvider>
   );
 }
+
