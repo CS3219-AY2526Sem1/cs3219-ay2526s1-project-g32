@@ -13,10 +13,16 @@ PeerPrep is a collaborative coding platform composed of multiple services. Each 
 | Collaboration Service | `collaboration_service/` | Session snapshots, token issuance, Yjs gateway | 4010 |
 | Redis / RabbitMQ | Docker images | Backing infrastructure for queues, cache, pub/sub | 6379 / 5672 |
 
+## Environment Configuration
+
+1. Copy the repo-level `.env.example` to `.env` and fill in your Supabase keys plus any overrides (ports, Redis URL, hostname tweaks, etc.).
+2. `docker compose` automatically reads this root `.env` and injects the values into every service, so you only configure secrets once.
+3. When running a service individually, it will try to load the repo-level `.env` first and then a service-local `.env` if you need temporary overrides. Maintaining per-service `.env` files is now optional.
+
 ## Running the Full Stack (Docker)
 
 1. Ensure Docker Desktop (or compatible engine) is running.
-2. Copy each `.env.example` to `.env` inside the corresponding service folders (at minimum `user_service`, `question_service`, `collaboration_service`, `frontend`). Supabase credentials are required for the user/question services.
+2. Copy `.env.example` (repo root) to `.env` and populate the required values (Supabase credentials are needed for the user and question services).
 3. From the repo root (`cs3219-ay2526s1-project-g32/`), start everything:
 
    ```bash
@@ -69,11 +75,11 @@ Refer to each service-specific README for detailed capabilities, environment var
 Each service ships with its own `Dockerfile` and `.dockerignore`. The repo includes:
 - `docker-compose.yml` – builds production-style images for every service plus Redis/RabbitMQ
 - `docker-compose.override.yml` – mounts source folders and runs `npm run dev` for hot reload during local development
-- `.env.example` files per service documenting required variables
+- `.env.example` at the repo root (authoritative list of env vars) plus per-service examples for standalone debugging
 
 ### Development
 ```bash
-cp <service>/.env.example <service>/.env    # fill in Supabase secrets, etc.
+cp .env.example .env    # fill in Supabase secrets, etc.
 docker compose up --build
 ```
 The override file mounts your source tree so changes trigger the dev servers automatically.

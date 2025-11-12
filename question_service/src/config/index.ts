@@ -1,5 +1,17 @@
-import 'dotenv/config';
+import { config as loadEnv } from 'dotenv';
+import { existsSync } from 'fs';
+import path from 'path';
 import { EnvSchema, type EnvConfig } from './env';
+
+const repoEnvPath = path.resolve(__dirname, '../../..', '.env');
+if (existsSync(repoEnvPath)) {
+  loadEnv({ path: repoEnvPath });
+}
+
+const serviceEnvPath = path.resolve(__dirname, '../../.env');
+if (existsSync(serviceEnvPath)) {
+  loadEnv({ path: serviceEnvPath, override: true });
+}
 
 const parsePositiveNumber = (value: string | undefined, defaultValue: number): number => {
   if (!value) return defaultValue;

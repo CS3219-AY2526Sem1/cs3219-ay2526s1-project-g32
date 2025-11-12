@@ -1,7 +1,17 @@
 import { config as loadEnv } from 'dotenv';
+import { existsSync } from 'fs';
+import path from 'path';
 import { z } from 'zod';
 
-loadEnv();
+const repoEnvPath = path.resolve(__dirname, '../../..', '.env');
+if (existsSync(repoEnvPath)) {
+  loadEnv({ path: repoEnvPath });
+}
+
+const serviceEnvPath = path.resolve(__dirname, '../../.env');
+if (existsSync(serviceEnvPath)) {
+  loadEnv({ path: serviceEnvPath, override: true });
+}
 
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),

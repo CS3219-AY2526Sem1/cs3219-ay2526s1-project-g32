@@ -16,7 +16,7 @@ Express + TypeScript API backed by Supabase Postgres (`questionsv3` table). Supp
 - Basic health endpoint for Docker health checks
 
 ## Running with Docker Compose
-1. Copy `question_service/.env.example` to `.env` and set Supabase URL + keys.
+1. Copy the repo-level `.env.example` to `.env` and set your Supabase URL + keys (the question service reads from that shared file, so no per-service `.env` is required).
 2. From repo root run:
    ```bash
    docker compose up --build question

@@ -10,7 +10,7 @@ Next.js (App Router) app styled with Ant Design. Implements onboarding, login, m
 - Monaco editor + Yjs client for collaboration sessions
 
 ## Running with Docker Compose
-1. Copy `frontend/.env.example` to `.env` (or `.env.local`) and ensure the URLs match the Docker hostnames:  
+1. Populate the repo-level `.env` with the `NEXT_PUBLIC_*` URLs (Docker Compose forwards them into the frontend container). For local-only tweaks you can still create `frontend/.env.local`. Ensure the defaults match the compose hostnames:  
    - `NEXT_PUBLIC_USER_SERVICE_URL=http://user:4001/api/v1`  
    - `NEXT_PUBLIC_MATCHING_SERVICE_URL=http://matching:3002/api/v1/matching`  
    - `NEXT_PUBLIC_COLLAB_SERVICE_URL=http://collaboration:4010/api/v1`  

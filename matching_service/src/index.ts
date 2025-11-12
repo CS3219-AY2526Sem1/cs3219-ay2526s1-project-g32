@@ -5,13 +5,22 @@
  */
 import express, { Express, Request, Response } from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
+import { config as loadEnv } from 'dotenv';
+import { existsSync } from 'fs';
+import path from 'path';
 import matchingRoutes from './routes/matching';
 import healthRoutes from './routes/health';
 import { connectRabbitMQ, timeoutService } from './services/timeoutService';
 
-// Load environment variables from a .env file into process.env
-dotenv.config();
+const repoEnvPath = path.resolve(__dirname, '../../..', '.env');
+if (existsSync(repoEnvPath)) {
+  loadEnv({ path: repoEnvPath });
+}
+
+const serviceEnvPath = path.resolve(__dirname, '../../.env');
+if (existsSync(serviceEnvPath)) {
+  loadEnv({ path: serviceEnvPath, override: true });
+}
 
 const app: Express = express();
 const PORT: number = parseInt(process.env.PORT || '3002', 10);
