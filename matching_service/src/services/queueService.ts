@@ -136,27 +136,132 @@ class QueueService {
    */
   public async findMatchInQueue(difficulty: string, topic: string): Promise<QueueEntry | null> {
     const queueKey = getQueueKey(topic);
-    // Get all users currently in the queue for this topic.
-    const queueEntries = await redisClient.lRange(queueKey, 0, -1);
 
-    for (let i = 0; i < queueEntries.length; i++) {
-      const entryString = queueEntries[i];
-      const entry: QueueEntry = JSON.parse(entryString);
+    // Lua script: iterate over list entries, find the first entry that
+    // contains the difficulty JSON fragment, remove that entry atomically
+    // using LREM, and return the matched entry string. This avoids the
+    // race between LRANGE (read) and LREM (remove) from separate calls.
+    const lua = `
+      local q = KEYS[1]
+      local difficulty = ARGV[1]
+      local entries = redis.call('LRANGE', q, 0, -1)
+      for i = 1, #entries do
+        local v = entries[i]
+        -- Look for the difficulty field in the JSON string. This is a
+        -- simple substring match and relies on stable JSON formatting.
+        if string.find(v, '"difficulty":"' .. difficulty .. '"', 1, true) then
+          -- Atomically remove this exact entry string and return it.
+          redis.call('LREM', q, 1, v)
+          return v
+        end
+      end
+      return nil
+    `;
 
-      if (entry.difficulty === difficulty) {
-        // Match found! Atomically remove this specific entry from the list.
-        // LREM command removes the first occurrence of a value from a list.
-        await redisClient.lRem(queueKey, 1, entryString);
-        console.log(`Match found for difficulty '${difficulty}' in topic '${topic}'. Matched with user ${entry.userId}.`);
-        return {
-          ...entry,
-          displayName: typeof entry.displayName === 'string' ? entry.displayName : undefined,
-        };
+    try {
+      const matchedRaw: unknown = await redisClient.eval(lua, { keys: [queueKey], arguments: [difficulty] });
+      let matched: string | null = null;
+      if (matchedRaw == null) {
+        matched = null;
+      } else if (typeof matchedRaw === 'string') {
+        matched = matchedRaw as string;
+      } else {
+        // Fallback: coerce other redis reply types into string
+        try {
+          matched = JSON.stringify(matchedRaw as any);
+        } catch (_) {
+          matched = String(matchedRaw as any);
+        }
       }
+      if (!matched) return null;
+      const entry: QueueEntry = JSON.parse(matched);
+      console.log(`Match found for difficulty '${difficulty}' in topic '${topic}'. Matched with user ${entry.userId}.`);
+      return {
+        ...entry,
+        displayName: typeof entry.displayName === 'string' ? entry.displayName : undefined,
+      };
+    } catch (err) {
+      console.error('[QueueService] Error running atomic match Lua script:', err);
+      // Fallback to non-atomic approach if eval fails
+      const queueEntries = await redisClient.lRange(queueKey, 0, -1);
+      for (const entryString of queueEntries) {
+        const entry: QueueEntry = JSON.parse(entryString);
+        if (entry.difficulty === difficulty) {
+          await redisClient.lRem(queueKey, 1, entryString);
+          return { ...entry, displayName: typeof entry.displayName === 'string' ? entry.displayName : undefined };
+        }
+      }
+      return null;
     }
+  }
 
-    // No match was found in the queue.
-    return null;
+  /**
+   * Searches a topic queue for a user with a matching difficulty but excludes
+   * a specific userId from being matched (prevents self-matching when the same
+   * user has multiple entries in the queue after expand).
+   * If a match is found, it atomically removes the matched user from the queue.
+   * @param difficulty - The difficulty to match.
+   * @param topic - The topic queue to search in.
+   * @param excludeUserId - A userId to exclude from matching (usually the requester).
+   * @returns The matched user's data, or null if no match is found.
+   */
+  public async findMatchInQueueExcluding(difficulty: string, topic: string, excludeUserId: string): Promise<QueueEntry | null> {
+    const queueKey = getQueueKey(topic);
+
+    // Lua script: find the first entry matching difficulty and not matching
+    // excludeUserId, remove it atomically and return it.
+    const lua = `
+      local q = KEYS[1]
+      local difficulty = ARGV[1]
+      local excludeUserId = ARGV[2]
+      local entries = redis.call('LRANGE', q, 0, -1)
+      for i = 1, #entries do
+        local v = entries[i]
+        if not string.find(v, '"userId":"' .. excludeUserId .. '"', 1, true) then
+          if string.find(v, '"difficulty":"' .. difficulty .. '"', 1, true) then
+            redis.call('LREM', q, 1, v)
+            return v
+          end
+        end
+      end
+      return nil
+    `;
+
+    try {
+      const matchedRaw: unknown = await redisClient.eval(lua, { keys: [queueKey], arguments: [difficulty, excludeUserId] });
+      let matched: string | null = null;
+      if (matchedRaw == null) {
+        matched = null;
+      } else if (typeof matchedRaw === 'string') {
+        matched = matchedRaw as string;
+      } else {
+        try {
+          matched = JSON.stringify(matchedRaw as any);
+        } catch (_) {
+          matched = String(matchedRaw as any);
+        }
+      }
+      if (!matched) return null;
+      const entry: QueueEntry = JSON.parse(matched);
+      console.log(`Match found for difficulty '${difficulty}' in topic '${topic}'. Matched with user ${entry.userId}.`);
+      return {
+        ...entry,
+        displayName: typeof entry.displayName === 'string' ? entry.displayName : undefined,
+      };
+    } catch (err) {
+      console.error('[QueueService] Error running atomic match excluding Lua script:', err);
+      // Fallback to non-atomic approach
+      const queueEntries = await redisClient.lRange(queueKey, 0, -1);
+      for (const entryString of queueEntries) {
+        const entry: QueueEntry = JSON.parse(entryString);
+        if (entry.userId === excludeUserId) continue;
+        if (entry.difficulty === difficulty) {
+          await redisClient.lRem(queueKey, 1, entryString);
+          return { ...entry, displayName: typeof entry.displayName === 'string' ? entry.displayName : undefined };
+        }
+      }
+      return null;
+    }
   }
   
   /**

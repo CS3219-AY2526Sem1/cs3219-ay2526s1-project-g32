@@ -221,7 +221,7 @@ export default function MatchingPage() {
                 />
               </svg>
               <Title level={4} style={{ color: '#fff', margin: 0 }}>
-                ðŸ§© Find Your Coding Partner
+                 Find Your Coding Partner
               </Title>
             </div>
             <Space>
