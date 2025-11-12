@@ -30,7 +30,6 @@ export default function DashboardPage() {
   const userId = user?.id ?? null;
   const [activeSession, setActiveSession] = useState<ActiveSessionResponse | null>(null);
   const [checkingActive, setCheckingActive] = useState(false);
-  const [activeError, setActiveError] = useState<string | null>(null);
   const [historyItems, setHistoryItems] = useState<HistoryListItem[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
@@ -43,7 +42,6 @@ export default function DashboardPage() {
 
     let cancelled = false;
     setCheckingActive(true);
-    setActiveError(null);
 
     fetchActiveSessionForUser({ userId, accessToken })
       .then((result) => {
@@ -53,11 +51,7 @@ export default function DashboardPage() {
       .catch((error) => {
         if (cancelled) return;
         setActiveSession(null);
-        if (error instanceof Error) {
-          setActiveError(error.message);
-        } else {
-          setActiveError("Unable to check active session");
-        }
+        console.warn("Failed to fetch active session", error);
       })
       .finally(() => {
         if (!cancelled) {
@@ -269,12 +263,6 @@ export default function DashboardPage() {
               {checkingActive && (
                 <Card className="dark-card" bordered>
                   <Text style={{ color: "var(--muted)" }}>Checking for active sessions...</Text>
-                </Card>
-              )}
-
-              {activeError && !checkingActive && (
-                <Card className="dark-card" bordered>
-                  <Text style={{ color: "#ff7875" }}>{activeError}</Text>
                 </Card>
               )}
 

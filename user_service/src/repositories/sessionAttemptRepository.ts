@@ -43,19 +43,15 @@ export class SessionAttemptRepository {
   async listUserAttempts(userId: string): Promise<UserAttemptRecord[]> {
     const { data, error } = await this.client
       .from('user_attempts')
-      .select('id, session_attempt_id')
-      .eq('id', userId)
+      .select('user_id, session_attempt_id')
+      .eq('user_id', userId)
       .order('session_attempt_id', { ascending: false });
 
     if (error) {
       throw error;
     }
 
-    const rows = (data as Array<{ id: string; session_attempt_id: string }>) ?? [];
-    return rows.map((row) => ({
-      user_id: row.id,
-      session_attempt_id: row.session_attempt_id,
-    }));
+    return (data as UserAttemptRecord[]) ?? [];
   }
 
   async getSessionAttempt(sessionAttemptId: string): Promise<SessionAttemptRecord | null> {
@@ -117,7 +113,7 @@ export class SessionAttemptRepository {
 
     const uniqueIds = Array.from(new Set(userIds));
     const rows = uniqueIds.map((userId) => ({
-      id: userId,
+      user_id: userId,
       session_attempt_id: sessionAttemptId,
     }));
 
@@ -130,8 +126,8 @@ export class SessionAttemptRepository {
   async userOwnsAttempt(userId: string, sessionAttemptId: string): Promise<boolean> {
     const { data, error } = await this.client
       .from('user_attempts')
-      .select('id')
-      .eq('id', userId)
+      .select('user_id')
+      .eq('user_id', userId)
       .eq('session_attempt_id', sessionAttemptId)
       .limit(1)
       .maybeSingle();
