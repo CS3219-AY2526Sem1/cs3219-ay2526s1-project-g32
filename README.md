@@ -18,6 +18,7 @@ PeerPrep is a collaborative coding platform composed of multiple services. Each 
 1. Copy the repo-level `.env.example` to `.env` and fill in your Supabase keys plus any overrides (ports, Redis URL, hostname tweaks, etc.).
 2. `docker compose` automatically reads this root `.env` and injects the values into every service, so you only configure secrets once.
 3. When running a service individually, it will try to load the repo-level `.env` first and then a service-local `.env` if you need temporary overrides. Maintaining per-service `.env` files is now optional.
+   - **Frontend note:** `NEXT_PUBLIC_*` values are baked into the browser bundle during the Docker build, so keep them reachable from your host machine (typically `http://localhost:40xx`). Docker Compose forwards the same variables as build args and runtime env vars automatically.
 
 ## Running the Full Stack (Docker)
 
