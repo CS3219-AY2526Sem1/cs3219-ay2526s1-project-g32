@@ -8,6 +8,7 @@ import {
   validateTokenHandler,
   setAdminStatusHandler,
   setAdminStatusByEmailHandler,
+  updatePasswordHandler,
 } from '../controllers/auth.controller';
 import { authenticate } from '../middleware/authenticate';
 import { requireAdmin } from '../middleware/requireAdmin';
@@ -19,6 +20,7 @@ import {
   validateTokenSchema,
   setAdminStatusSchema,
   setAdminStatusByEmailSchema,
+  updatePasswordSchema,
 } from '../validation/authSchemas';
 
 const router = Router();
@@ -41,6 +43,12 @@ router.patch(
   requireAdmin,
   validateRequest(setAdminStatusByEmailSchema),
   setAdminStatusByEmailHandler,
+);
+router.patch(
+  '/password',
+  authenticate,
+  validateRequest(updatePasswordSchema),
+  updatePasswordHandler,
 );
 
 export const authRouter = router;

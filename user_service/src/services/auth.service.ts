@@ -215,3 +215,20 @@ export const updateUserAdminStatusByEmail = async (email: string, isAdmin: boole
   
   return updateUserAdminStatus(user.id, isAdmin);
 };
+
+export const updateUserPassword = async (userId: string, password: string) => {
+  const { data, error } = await supabaseAdminClient.auth.admin.updateUserById(userId, {
+    password,
+  });
+
+  if (error) {
+    throw new HttpError(error.status ?? 400, error.message, error);
+  }
+
+  const updated = toPublicUser(data.user);
+  if (!updated) {
+    throw new HttpError(500, 'Failed to update user password');
+  }
+
+  return updated;
+};
