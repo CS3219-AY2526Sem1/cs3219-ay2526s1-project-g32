@@ -17,7 +17,7 @@ Identity and admin microservice built with Express + TypeScript. It relies on Su
 - Admin-only API to promote/demote users (persisted in Supabase metadata)
 
 ## Running with Docker Compose
-1. Copy `user_service/.env.example` to `user_service/.env` and fill in the Supabase values (`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_ANON_KEY`, `SUPABASE_JWT_SECRET`).  
+1. Configure the repo-level `.env` with your Supabase values (`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_ANON_KEY`, `SUPABASE_JWT_SECRET`). The service automatically reads from that file (you can still add `user_service/.env` for temporary overrides if needed).  
 2. From the repo root run:
    ```bash
    docker compose up --build user

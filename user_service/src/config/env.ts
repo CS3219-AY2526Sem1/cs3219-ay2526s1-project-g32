@@ -1,4 +1,6 @@
 import { config as loadEnv } from 'dotenv';
+import { existsSync } from 'fs';
+import path from 'path';
 import { z } from 'zod';
 
 // validate and parse environment variables with Zod
@@ -13,8 +15,15 @@ const envSchema = z.object({
   INTERNAL_SERVICE_KEY: z.string().min(1, 'INTERNAL_SERVICE_KEY is required'),
 });
 
-// load .env into process.env
-loadEnv();
+const repoEnvPath = path.resolve(__dirname, '../../..', '.env');
+if (existsSync(repoEnvPath)) {
+  loadEnv({ path: repoEnvPath });
+}
+
+const serviceEnvPath = path.resolve(__dirname, '../../.env');
+if (existsSync(serviceEnvPath)) {
+  loadEnv({ path: serviceEnvPath, override: true });
+}
 
 const parsedEnv = envSchema.safeParse(process.env);
 

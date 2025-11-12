@@ -19,7 +19,7 @@ Manages coding session metadata, issues per-session JWTs, and exposes the secure
 - Session history export: when a session ends, Yjs docs are persisted to the user service history API
 
 ## Running with Docker Compose
-1. Copy `collaboration_service/.env.example` to `.env`. Set:
+1. Configure the repo-level `.env` with the collaboration settings:
    - `REDIS_URL` (matches Docker compose service `redis`)
    - `USER_SERVICE_URL` / `QUESTION_SERVICE_URL`
    - `USER_SERVICE_INTERNAL_KEY`
