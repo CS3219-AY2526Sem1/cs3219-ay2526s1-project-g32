@@ -395,6 +395,14 @@ export const acceptExpand = async (req: AuthenticatedRequest, res: Response) => 
             topic,
           );
 
+          // If session creation failed, createCollaborationSession returns null
+          // after attempting to re-queue both users. Handle that similarly to
+          // createMatchRequest: return 202 to indicate the client was re-queued.
+          if (session === null) {
+            console.warn('[Controller] Collaboration service creation failed during expand; users were re-queued (best-effort).');
+            return res.status(202).json({ status: 'pending', message: 'Temporary failure creating collaboration session; you have been re-queued.' });
+          }
+
           // Persist sessionId for both users
           const sessionKeyA = `match_session:${userId}`;
           const sessionKeyB = `match_session:${matchedUser.userId}`;
