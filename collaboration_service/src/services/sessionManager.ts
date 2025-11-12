@@ -1,12 +1,18 @@
 import jwt from 'jsonwebtoken';
 import { v4 as uuidv4 } from 'uuid';
 
-import type { QuestionSnapshot, SessionCreatePayload, SessionSnapshot, SessionTokenRequest } from '../types';
+import type {
+  QuestionSnapshot,
+  SessionCreatePayload,
+  SessionSnapshot,
+  SessionTokenRequest,
+} from '../types';
 import { SessionSnapshotSchema } from '../schemas';
 import type { PresenceRepository, SessionRepository } from '../repositories';
 import type { WSSharedDoc } from '@y/websocket-server/utils';
 import { getYDoc } from '@y/websocket-server/utils';
 import { logger } from '../utils/logger';
+import type { HistoryClient } from './historyClient';
 
 const DEFAULT_LANGUAGES = ['javascript', 'python', 'java', 'c', 'cpp'] as const;
 const normalizeLanguage = (language: string) => language.toLowerCase();
@@ -22,6 +28,7 @@ export class SessionManager {
     private readonly sessions: SessionRepository,
     private readonly presence: PresenceRepository,
     private readonly options: SessionManagerOptions,
+    private readonly historyClient?: HistoryClient,
   ) {}
 
   private readonly expiryTimers = new Map<string, NodeJS.Timeout>();
@@ -199,11 +206,31 @@ export class SessionManager {
     await this.sessions.update(updated);
   }
 
-  async endSession(sessionId: string, _reason?: string): Promise<void> {
+  async endSession(sessionId: string, reason?: string): Promise<void> {
+    const session = await this.sessions.getById(sessionId);
+    if (!session) {
+      return;
+    }
+
+    if (session.status === 'ended') {
+      return;
+    }
+
+    logger.info({ sessionId, reason }, 'Ending collaboration session');
+
     const endedAt = new Date().toISOString();
+    const endedSnapshot: SessionSnapshot = SessionSnapshotSchema.parse({
+      ...session,
+      status: 'ended',
+      endedAt,
+      updatedAt: endedAt,
+    });
+
     this.clearExpiryTimer(sessionId);
-    await this.sessions.markEnded(sessionId, endedAt);
+    await this.sessions.update(endedSnapshot);
     await this.presence.clearPresence(sessionId);
+
+    await this.persistAttemptSnapshot(endedSnapshot);
   }
 
   private async initializeDocuments(snapshot: SessionSnapshot): Promise<void> {
@@ -299,5 +326,69 @@ export class SessionManager {
 
     logger.info({ sessionId }, 'Grace period elapsed; terminating session');
     await this.endSession(sessionId, 'grace_period_elapsed');
+  }
+
+  private async persistAttemptSnapshot(session: SessionSnapshot): Promise<void> {
+    if (!this.historyClient) {
+      return;
+    }
+
+    try {
+      const codeSnapshot = await this.collectCodeSnapshot(session);
+      const numericQuestionId = Number(session.question.questionId);
+
+      await this.historyClient.saveAttempt({
+        sessionId: session.sessionId,
+        matchId: session.matchId,
+        questionId: Number.isFinite(numericQuestionId) ? numericQuestionId : undefined,
+        questionTitle: session.question.title,
+        startedAt: session.createdAt ?? null,
+        endedAt: session.endedAt ?? new Date().toISOString(),
+        participants: session.participants.map((participant) => ({
+          userId: participant.userId,
+          displayName: participant.displayName,
+        })),
+        code: {
+          python: codeSnapshot.python ?? null,
+          c: codeSnapshot.c ?? null,
+          cpp: codeSnapshot.cpp ?? null,
+          java: codeSnapshot.java ?? null,
+          javascript: codeSnapshot.javascript ?? null,
+        },
+      });
+    } catch (error) {
+      logger.warn({ err: error, sessionId: session.sessionId }, 'Failed to persist session attempt');
+    }
+  }
+
+  private async collectCodeSnapshot(
+    session: SessionSnapshot,
+  ): Promise<Partial<Record<string, string>>> {
+    const entries = Object.entries(session.documents.languages);
+    if (entries.length === 0) {
+      return {};
+    }
+
+    const results = await Promise.all(
+      entries.map(async ([language, docKey]) => {
+        const docName = `session:${session.sessionId}/${docKey}`;
+        try {
+          const doc = getYDoc(docName, true) as WSSharedDoc;
+          if (doc.whenInitialized) {
+            await doc.whenInitialized.catch(() => {});
+          }
+          const text = doc.getText('monaco');
+          return [normalizeLanguage(language), text?.toString() ?? ''] as const;
+        } catch (error) {
+          logger.warn({ err: error, sessionId: session.sessionId, docKey }, 'Failed to read doc snapshot');
+          return [normalizeLanguage(language), ''] as const;
+        }
+      }),
+    );
+
+    return results.reduce<Record<string, string>>((acc, [language, content]) => {
+      acc[language] = content;
+      return acc;
+    }, {});
   }
 }

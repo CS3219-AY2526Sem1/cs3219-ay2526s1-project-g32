@@ -1,5 +1,4 @@
 'use client';
-
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button, Card, Col, ConfigProvider, Layout, Row, Select, Space, Typography, message, Modal } from 'antd';
@@ -8,11 +7,9 @@ import { useAuth } from '../../hooks/useAuth';
 import { useRequireAuth } from '../../hooks/useRequireAuth';
 import { startMatchmaking, getMatchStatus, cancelMatch, acceptExpand } from '../../lib/api-client';
 import { peerPrepTheme } from '../../lib/theme';
-
 const { Header, Content } = Layout;
 const { Title, Text, Paragraph } = Typography;
 const { Option } = Select;
-
 // Define the available topics and difficulties (kept in sync with Question Service)
 const TOPICS = [
   'Array',
@@ -53,9 +50,7 @@ const TOPICS = [
   'Two Pointers',
   'Union Find'
 ];
-
 const DIFFICULTIES = ['Easy', 'Medium', 'Hard'];
-
 export default function MatchingPage() {
   const { isAuthenticated, isReady } = useRequireAuth();
   const { user, session, logout } = useAuth();
@@ -67,12 +62,10 @@ export default function MatchingPage() {
   const [showExpandModal, setShowExpandModal] = useState(false);
   const [expandDeclined, setExpandDeclined] = useState(false);
   const router = useRouter();
-
   const displayName =
     typeof user?.userMetadata?.username === 'string' && user.userMetadata.username.trim().length > 0
       ? (user.userMetadata.username as string)
       : user?.email ?? user?.id ?? 'Anonymous';
-
   // Poll for match status when matching
   useEffect(() => {
     if (isMatching && user && session) {
@@ -103,8 +96,8 @@ export default function MatchingPage() {
       setPollInterval(interval);
       return () => clearInterval(interval);
     }
-  }, [isMatching, user, session, expandDeclined]);
-
+  }, [isMatching, router, session, user, expandDeclined]);
+  
   if (!isReady) {
     return (
       <ConfigProvider theme={peerPrepTheme}>
@@ -118,17 +111,14 @@ export default function MatchingPage() {
       </ConfigProvider>
     );
   }
-
   if (!isAuthenticated || !user || !session) {
     return null;
   }
-
   const handleStartMatching = async () => {
     if (!selectedTopic || !selectedDifficulty) {
       message.error('Please select both topic and difficulty');
       return;
     }
-
     setIsMatching(true);
   // Reset decline state for a fresh matching attempt
   setExpandDeclined(false);
@@ -153,18 +143,17 @@ export default function MatchingPage() {
         message.success(`Looking for a match in ${selectedTopic} (${selectedDifficulty})...`);
       }
       
-    } catch (error: any) {
-      message.error(error.message || 'Failed to start matchmaking');
+    } catch (error) {
+      const description = error instanceof Error ? error.message : null;
+      message.error(description ?? 'Failed to start matchmaking');
       setIsMatching(false);
     }
   };
-
   const handleCancelMatching = async () => {
     if (pollInterval) {
       clearInterval(pollInterval);
       setPollInterval(null);
     }
-
     try {
       if (selectedTopic) {
         await cancelMatch(selectedTopic, session.accessToken);
@@ -173,14 +162,13 @@ export default function MatchingPage() {
       // reset decline state when user explicitly cancels
       setExpandDeclined(false);
       message.info('Matchmaking cancelled');
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error cancelling match:', error);
       setIsMatching(false);
       setExpandDeclined(false);
       message.info('Matchmaking cancelled');
     }
   };
-
   const handleAcceptExpand = async () => {
     try {
       if (session) {
@@ -190,14 +178,12 @@ export default function MatchingPage() {
         // reset any decline state after accepting
         setExpandDeclined(false);
       }
-    } catch (err: any) {
-      console.error('Error accepting expand:', err);
+    } catch (error) {
+      console.error('Error accepting expand:', error);
       message.error('Failed to expand search');
     }
   };
-
   const username = user.userMetadata?.username as string || user.email || 'User';
-
   return (
     <ConfigProvider theme={peerPrepTheme}>
       <Layout style={{ minHeight: '100vh', background: 'var(--bg)' }}>
@@ -235,10 +221,9 @@ export default function MatchingPage() {
                 />
               </svg>
               <Title level={4} style={{ color: '#fff', margin: 0 }}>
-                🧩 Find Your Coding Partner
+                ðŸ§© Find Your Coding Partner
               </Title>
             </div>
-
             <Space>
               <Text style={{ color: 'var(--muted)' }}>Welcome, {username}</Text>
               <Button type="link" onClick={logout}>
@@ -250,7 +235,6 @@ export default function MatchingPage() {
             </Space>
           </div>
         </Header>
-
         <Content className="main-content">
           {/* background shapes */}
           <div className="blob" aria-hidden="true" />
@@ -278,7 +262,6 @@ export default function MatchingPage() {
                     Select your preferred coding topic and difficulty level to find the perfect practice partner.
                   </Paragraph>
                 </div>
-
                 {/* Topic Selection */}
                 <div>
                   <Text strong style={{ display: 'block', marginBottom: '8px', color: 'var(--text)' }}>
@@ -299,7 +282,6 @@ export default function MatchingPage() {
                     ))}
                   </Select>
                 </div>
-
                 {/* Difficulty Selection */}
                 <div>
                   <Text strong style={{ display: 'block', marginBottom: '8px', color: 'var(--text)' }}>
@@ -333,7 +315,6 @@ export default function MatchingPage() {
                     ))}
                   </Select>
                 </div>
-
                 {/* Action Buttons */}
                 <div style={{ textAlign: 'center', marginTop: '24px' }}>
                   {!isMatching ? (
@@ -370,7 +351,7 @@ export default function MatchingPage() {
                           </Text>
                           <br />
                           <Text style={{ color: 'var(--muted)' }}>
-                            Topic: {selectedTopic} • Difficulty: {selectedDifficulty}
+                            Topic: {selectedTopic} &bull; Difficulty: {selectedDifficulty}
                           </Text>
                         </div>
                       </div>
@@ -388,7 +369,6 @@ export default function MatchingPage() {
                     </Space>
                   )}
                 </div>
-
                 {/* Info Section */}
                 {!isMatching && (
                   <div style={{ 
@@ -399,7 +379,7 @@ export default function MatchingPage() {
                     border: '1px solid var(--border)'
                   }}>
                     <Text style={{ fontSize: '14px', color: 'var(--muted)' }}>
-                      💡 <strong style={{ color: 'var(--text)' }}>How it works:</strong> We'll match you with another developer who selected the same topic and difficulty. Once matched, you'll be redirected to a collaborative coding session.
+                      &bull; <strong style={{ color: 'var(--text)' }}>How it works:</strong> We&rsquo;ll match you with another developer who selected the same topic and difficulty. Once matched, you&rsquo;ll be redirected to a collaborative coding session.
                     </Text>
                   </div>
                 )}
@@ -421,7 +401,7 @@ export default function MatchingPage() {
           okText="Yes, expand"
           cancelText="No"
         >
-          <p>You've been waiting for a while. Would you like to expand your search to Easy, Medium and Hard for this topic?</p>
+          <p>You&rsquo;ve been waiting for a while. Would you like to expand your search to Easy, Medium and Hard for this topic?</p>
         </Modal>
       </Layout>
     </ConfigProvider>

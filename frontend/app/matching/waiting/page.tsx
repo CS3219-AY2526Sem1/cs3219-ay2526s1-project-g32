@@ -2,11 +2,12 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { Button, Card, ConfigProvider, Layout, Progress, Space, Typography, message } from 'antd';
+import { Button, Card, ConfigProvider, Layout, Progress, Space, Typography } from 'antd';
 import { ClockCircleOutlined, UserOutlined } from '@ant-design/icons';
 import { useAuth } from '../../../hooks/useAuth';
 import { useRequireAuth } from '../../../hooks/useRequireAuth';
 import { getMatchStatus, cancelMatch } from '../../../lib/api-client';
+import type { MatchStatusResponse } from '../../../lib/api-client';
 import { peerPrepTheme } from '../../../lib/theme';
 
 const { Header, Content } = Layout;
@@ -26,10 +27,16 @@ export default function MatchingWaitingPage() {
   useEffect(() => {
     if (!user || !session) return;
 
+    type ExtendedMatchStatus = MatchStatusResponse & {
+      collaborationUrl?: string;
+      sessionUrl?: string;
+      url?: string;
+      session?: { url?: string };
+    };
+
     const checkStatus = async () => {
       try {
-        // Accept any shape from server; we only rely on known fields below
-        const res: any = await getMatchStatus(user.id, session.accessToken);
+        const res = (await getMatchStatus(user.id, session.accessToken)) as ExtendedMatchStatus;
         const status = res?.status;
         if (status) setMatchStatus(status);
 
@@ -53,8 +60,9 @@ export default function MatchingWaitingPage() {
                 try {
                   // External or internal URL
                   router.push(url);
-                } catch (e) {
+                } catch (navigationError) {
                   // Fallback to full navigation
+                  console.error('Failed to navigate via router.push:', navigationError);
                   window.location.href = url;
                 }
                 return;
@@ -68,8 +76,8 @@ export default function MatchingWaitingPage() {
 
             // If no redirect information is present, keep showing success state but stop re-redirect attempts
             // (You may want to fetch another endpoint here to obtain the session URL.)
-          } catch (err) {
-            console.error('Redirect failed:', err);
+          } catch (redirectError) {
+            console.error('Redirect failed:', redirectError);
           }
         }
       } catch (error) {
@@ -84,7 +92,7 @@ export default function MatchingWaitingPage() {
     const statusInterval = setInterval(checkStatus, 2000);
 
     return () => clearInterval(statusInterval);
-  }, [user, session]);
+  }, [router, session, user]);
 
   // Timer for waiting time
   useEffect(() => {
@@ -120,13 +128,20 @@ export default function MatchingWaitingPage() {
         const params = new URLSearchParams(window.location.search);
         const qTopic = params.get('topic');
 
-        const hist = (window.history && (window.history.state as any)) || {};
-        const hTopic = hist?.topic || hist?.state?.topic || null;
+        type HistoryState = {
+          topic?: string;
+          state?: {
+            topic?: string;
+          };
+        };
+        const state = (window.history && (window.history.state as HistoryState | null)) || null;
+        const hTopic = state?.topic ?? state?.state?.topic ?? null;
 
-        const ssTopic = sessionStorage.getItem('matchingTopic') || localStorage.getItem('matchingTopic');
+        const ssTopic =
+          sessionStorage.getItem('matchingTopic') || localStorage.getItem('matchingTopic');
 
         return qTopic || hTopic || ssTopic || null;
-      } catch (e) {
+      } catch {
         return null;
       }
     };
@@ -150,6 +165,7 @@ export default function MatchingWaitingPage() {
       }
     } catch (helperErr) {
       // Fallback: call backend endpoint directly to ensure queue entry is removed.
+      console.error('Failed to cancel match using API helper:', helperErr);
       try {
         // As a last resort attempt a best-effort cancel via the matching service's
         // client-side helper endpoint. Many deployments proxy /api/matching/* to the
@@ -169,7 +185,8 @@ export default function MatchingWaitingPage() {
       // Redirect back to the matching setup regardless of cancellation outcome.
       try {
         router.push('/matching');
-      } catch (e) {
+      } catch (navigationError) {
+        console.error('Failed to navigate back to /matching using router.push:', navigationError);
         window.location.href = '/matching';
       }
     }
@@ -263,7 +280,7 @@ export default function MatchingWaitingPage() {
                   Searching for Your Perfect Match
                 </Title>
                 <Paragraph style={{ fontSize: '16px', color: 'var(--muted)', marginBottom: '30px' }}>
-                  We're finding another developer who shares your coding interests. 
+                  We&rsquo;re finding another developer who shares your coding interests. 
                   This usually takes less than 2 minutes.
                 </Paragraph>
               </div>

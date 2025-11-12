@@ -10,6 +10,7 @@ const envSchema = z.object({
   SUPABASE_ANON_KEY: z.string().min(1, 'SUPABASE_ANON_KEY is required'),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1, 'SUPABASE_SERVICE_ROLE_KEY is required'),
   SUPABASE_JWT_SECRET: z.string().min(1, 'SUPABASE_JWT_SECRET is required'),
+  INTERNAL_SERVICE_KEY: z.string().min(1, 'INTERNAL_SERVICE_KEY is required'),
 });
 
 // load .env into process.env

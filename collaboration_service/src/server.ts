@@ -4,7 +4,7 @@ import { buildApp } from './app';
 import { config } from './config';
 import { SessionController } from './controllers';
 import { RedisPresenceRepository, RedisSessionRepository } from './repositories';
-import { SessionManager } from './services';
+import { HistoryClient, SessionManager } from './services';
 import { attachCollaborationGateway } from './websocket';
 import { logger } from './utils/logger';
 
@@ -12,12 +12,16 @@ const redis = new Redis(config.redis.url);
 
 const sessionRepository = new RedisSessionRepository(redis);
 const presenceRepository = new RedisPresenceRepository(redis, Math.ceil(config.session.gracePeriodMs / 1000));
+const historyClient = new HistoryClient(
+  config.services.user.baseUrl,
+  config.services.user.internalKey,
+);
 
 const sessionManager = new SessionManager(sessionRepository, presenceRepository, {
   gracePeriodMs: config.session.gracePeriodMs,
   sessionTokenTtlSeconds: config.jwt.sessionTokenTtlSeconds,
   jwtSecret: config.jwt.secret,
-});
+}, historyClient);
 
 const sessionController = new SessionController(
   sessionManager,

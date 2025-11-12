@@ -66,6 +66,34 @@ export type MeResponse = {
   user: PublicUser | null;
 };
 
+export type UserAttemptRecord = {
+  user_id: string;
+  session_attempt_id: string;
+};
+
+export type HistoryListResponse = {
+  attempts: UserAttemptRecord[];
+};
+
+export type SessionAttemptRecord = {
+  id: string;
+  match_id: string | null;
+  question_id: number | null;
+  question_title: string | null;
+  started_at: string | null;
+  ended_at: string | null;
+  code_python: string | null;
+  code_c: string | null;
+  code_cpp: string | null;
+  code_java: string | null;
+  code_javascript: string | null;
+  participants?: Record<string, unknown> | null;
+};
+
+export type SessionAttemptDetailResponse = {
+  attempt: SessionAttemptRecord;
+};
+
 const withBaseUrl = (path: string) => `${API_BASE_URL}${path}`;
 
 export const register = async (payload: RegisterPayload) =>
@@ -132,6 +160,26 @@ export const setAdminStatusByEmail = async (email: string, isAdmin: boolean, acc
         Authorization: `Bearer ${accessToken}`,
       },
       body: JSON.stringify({ email, isAdmin }),
+    }),
+  );
+
+export const fetchUserHistory = async (accessToken: string) =>
+  handleResponse<HistoryListResponse>(
+    await fetch(withBaseUrl('/history'), {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    }),
+  );
+
+export const fetchSessionAttemptDetail = async (sessionAttemptId: string, accessToken: string) =>
+  handleResponse<SessionAttemptDetailResponse>(
+    await fetch(withBaseUrl(`/history/${sessionAttemptId}`), {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
     }),
   );
 

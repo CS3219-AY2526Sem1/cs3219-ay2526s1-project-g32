@@ -27,4 +27,5 @@ export const config = {
     serviceRoleKey: env.SUPABASE_SERVICE_ROLE_KEY,
     jwtSecret: env.SUPABASE_JWT_SECRET,
   },
+  internalServiceKey: env.INTERNAL_SERVICE_KEY,
 };
