@@ -1,62 +1,53 @@
-# PeerPrep User Service
+# PeerPrep – User Service
 
-Node.js microservice for managing PeerPrep user accounts via Supabase Auth. Provides endpoints for registration, authentication, email verification magic links, and profile access for other platform components.
+## Overview
+Identity and admin microservice built with Express + TypeScript. It relies on Supabase Auth for account storage, exposes registration/login endpoints for the frontend, and provides secure helper APIs (admin promotion, token validation) for other services.
 
 ## Tech Stack
+- Express + TypeScript
+- Supabase Auth (email/password + magic link)
+- Zod for request validation
+- Pino logger
 
-- **Express + TypeScript**
-- **Supabase Auth** (email/password + magic link verification)
-- **Zod validation**
-- **JWT verification** using Supabase JWT secret
+## Capabilities
+- Register/login users and trigger Supabase verification emails
+- Resend verification (“magic link”) emails
+- `GET /auth/me` to hydrate the frontend session
+- Validate Supabase JWTs for downstream services
+- Admin-only API to promote/demote users (persisted in Supabase metadata)
 
-## Getting Started
-
-1. Duplicate `.env.example` into `.env` and fill in the Supabase project credentials listed below.
-2. Install dependencies:
-
+## Running with Docker Compose
+1. Copy `user_service/.env.example` to `user_service/.env` and fill in the Supabase values (`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_ANON_KEY`, `SUPABASE_JWT_SECRET`).  
+2. From the repo root run:
    ```bash
-   npm install --workspace user_service
+   docker compose up --build user
    ```
+3. Service is available at `http://localhost:4001`. Health probes and other services depend on this container name (`user`). Stop with `docker compose down`.
 
-   (or run `npm install` once at the repository root if you are using npm workspaces)
+## Running Individually
+```bash
+npm install           # once at repo root
+npm run dev --workspace user_service
+```
+The dev server listens on `http://localhost:4001`. Use `npm run build --workspace user_service` followed by `npm run start --workspace user_service` for a production build.
 
-3. Start the service:
-
-   ```bash
-   npm run dev --workspace user_service
-   ```
-
-The service listens on `http://localhost:4001` by default.
-
-## Required Environment Variables
-
-| Variable | Purpose |
+## Environment Variables
+| Variable | Description |
 | --- | --- |
-| `SUPABASE_URL` | Base URL of your Supabase project (from Project Settings > API). |
-| `SUPABASE_SERVICE_ROLE_KEY` | Service role key with elevated privileges for admin actions (keep this secret!). |
-| `SUPABASE_ANON_KEY` | Public anon key used for end-user interactions when elevated privileges are not needed. |
-| `SUPABASE_JWT_SECRET` | JWT secret configured in Supabase Auth (Project Settings > API). |
-| `PORT` | (Optional) Port to run the service on; defaults to `4001`. |
-| `CORS_ALLOWED_ORIGINS` | (Optional) Comma-separated list of allowed origins for CORS. |
+| `PORT` (default `4001`) | HTTP port |
+| `CORS_ALLOWED_ORIGINS` | Comma-separated list of allowed origins |
+| `SUPABASE_URL` | Supabase project URL |
+| `SUPABASE_SERVICE_ROLE_KEY` | Service role key (keep secret) |
+| `SUPABASE_ANON_KEY` | Public anon key exposed to frontend |
+| `SUPABASE_JWT_SECRET` | JWT secret configured in Supabase |
+| `INTERNAL_SERVICE_KEY` | Shared key used by other services (e.g., history snapshots) |
 
-## Supabase Setup Checklist
+## API Highlights
+- `POST /api/v1/auth/register` – create account (stores `isAdmin` metadata flag)
+- `POST /api/v1/auth/login` – email/password login, returns tokens and profile
+- `POST /api/v1/auth/verification/resend` – resend magic link
+- `GET /api/v1/auth/me` – fetch profile from Supabase with provided access token
+- `POST /api/v1/auth/token/validate` – internal token validation for other services
+- `PATCH /api/v1/auth/users/:userId/admin` – mark/unmark admin (requires admin auth)
 
-1. Create a Supabase project (or use an existing one) and capture the values above from **Project Settings > API Keys**.
-2. Under **Authentication > Settings**, enable email/password sign-ins and configure magic link policies per your requirements.
-3. Run the Supabase CLI to generate strongly typed bindings once your schema is ready:
-
-   ```bash
-   supabase gen types typescript --project-id <project-id> --schema public > src/types/supabase.ts
-   ```
-
-4. If you customise the JWT secret in Supabase, mirror it in your `.env` so the service can validate Supabase-issued access tokens.
-5. Share the anon key with frontend services only; keep the service role key limited to backend services like this user service.
-
-## API Overview
-
-- `POST /api/v1/auth/register`
-- `POST /api/v1/auth/login`
-- `POST /api/v1/auth/verification/resend`
-- `GET /api/v1/auth/me`
-
-See controller documentation (to be added) for payload specifics.
+All routes use JSON responses. See `src/routes/auth.route.ts` for full list and payload schemas in `src/validation/authSchemas.ts`.

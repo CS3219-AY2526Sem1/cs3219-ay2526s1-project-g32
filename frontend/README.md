@@ -1,55 +1,53 @@
-﻿# PeerPrep Frontend
+# PeerPrep – Frontend
 
-Next.js App Router frontend styled with Ant Design. Provides onboarding, login, magic-link verification flows, and a shared auth context that other microservice UIs can reuse.
+## Overview
+Next.js (App Router) app styled with Ant Design. Implements onboarding, login, magic-link verification, dashboard with active-session banner, admin screen, matching UI, session page, and read-only history view. Auth context persists Supabase tokens and shares them with child components.
 
-## Getting Started
+## Tech Stack
+- Next.js 14 (App Router, React 18)
+- Ant Design 5
+- Auth context with `useAuth` / `useRequireAuth`
+- Monaco editor + Yjs client for collaboration sessions
 
-1. Duplicate `.env.example` into `.env.local` and update the URLs if your user service runs somewhere else.
-2. Install dependencies from the repo root (workspace-aware):
-
+## Running with Docker Compose
+1. Copy `frontend/.env.example` to `.env` (or `.env.local`) and ensure the URLs match the Docker hostnames:  
+   - `NEXT_PUBLIC_USER_SERVICE_URL=http://user:4001/api/v1`  
+   - `NEXT_PUBLIC_MATCHING_SERVICE_URL=http://matching:3002/api/v1/matching`  
+   - `NEXT_PUBLIC_COLLAB_SERVICE_URL=http://collaboration:4010/api/v1`  
+   - `NEXT_PUBLIC_COLLAB_WS_URL=ws://collaboration:4010/collab`
+2. From repo root:
    ```bash
-   npm install
+   docker compose up --build frontend
    ```
+3. App is available at `http://localhost:3000`. The container depends on user, matching, question, and collaboration services.
 
-3. Start the dev server:
+## Running Individually
+```bash
+npm install
+npm run dev --workspace frontend
+```
+Build/start:
+```bash
+npm run build --workspace frontend
+npm run start --workspace frontend
+```
 
-   ```bash
-   npm run dev --workspace frontend
-   ```
-
-The app runs on `http://localhost:3000` by default.
-
-## Key Folders
-
-- `app/` – App Router routes (`page.tsx`, `login/page.tsx`, `register/page.tsx`, `verify-email/page.tsx`, `verify-success/page.tsx`, `dashboard/page.tsx`) plus layout/providers.
-- `app/session/[sessionId]/page.tsx` – Collaboration coding surface (question panel + Monaco editor scaffold, presently using mock data).
-- `context/AuthContext.tsx` – Stores session state, hydrates from `localStorage`, and fetches `/auth/me` when a token is present.
-- `hooks/` – `useAuth` for consuming the context and `useRequireAuth` for guarding routes.
-- `lib/api-client.ts` – Typed fetch wrapper for all user-service endpoints.
-
-## UI System
-
-- Ant Design components are used throughout (`Form`, `Card`, `Layout`, `Button`, etc.).
-- Custom branding tweaks live in `app/providers.tsx` via `ConfigProvider`, with lightweight global styles in `app/globals.css`.
-
-## Environment
-
-| Variable | Purpose |
+## Environment Variables
+| Variable | Description |
 | --- | --- |
-| `NEXT_PUBLIC_USER_SERVICE_URL` | Base URL for the user service (`http://localhost:4001/api/v1` by default). |
-| `NEXT_PUBLIC_VERIFY_REDIRECT` | URL embedded in Supabase magic-link emails (`http://localhost:3000/verify-success`). |
-| `NEXT_PUBLIC_COLLAB_SERVICE_URL` | Collaboration service REST base (`http://localhost:4010/api/v1`). |
-| `NEXT_PUBLIC_COLLAB_WS_URL` | Collaboration WebSocket endpoint (`ws://localhost:4010/collab`). |
+| `NEXT_PUBLIC_USER_SERVICE_URL` | Base URL of user service (`/api/v1`) |
+| `NEXT_PUBLIC_MATCHING_SERVICE_URL` | Matching service base (`/api/v1/matching`) |
+| `NEXT_PUBLIC_COLLAB_SERVICE_URL` | Collaboration REST base |
+| `NEXT_PUBLIC_COLLAB_WS_URL` | Collaboration WebSocket endpoint |
+| `NEXT_PUBLIC_VERIFY_REDIRECT` | URL used in Supabase magic-link emails |
 
-## Flow Overview
+## Key Routes
+- `/` – Landing page
+- `/login`, `/register`, `/verify-email`, `/verify-success` – Auth flows
+- `/dashboard` – Protected dashboard with active session banner
+- `/matching`, `/matching/waiting` – Matching setup & waiting room
+- `/session/[sessionId]` – Collaborative coding surface (Monaco + Yjs)
+- `/history/[sessionId]` – Read-only view of saved session attempt
+- `/admin` – Admin console (question CRUD + admin promotion)
 
-1. **Register** – Collects username/email/password and triggers the user service to send a Supabase magic link.
-2. **Verify Email** – Confirms that the link was sent and directs the user to their inbox.
-3. **Magic Link** – Supabase redirects verified users to `/verify-success`, which prompts them to log in.
-4. **Login & Dashboard** – Authenticates with email/password and renders the protected dashboard.
-
-## Next Steps
-
-- Integrate future microservice data into the dashboard (sessions, peer feedback, analytics).
-- Add end-to-end tests (Playwright/Cypress) once the broader system stabilises.
-- Replace `localStorage` session persistence with secure cookies when a gateway or SSR strategy is defined.
+Global styles live in `app/globals.css`. Ant Design theming is provided via `app/providers.tsx`.

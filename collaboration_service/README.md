@@ -1,99 +1,70 @@
-# Collaboration Service
+# PeerPrep – Collaboration Service
 
-Service responsible for provisioning real‑time coding sessions, issuing session-scoped tokens, and hosting the Yjs collaboration gateway used by the frontend editor.
+## Overview
+Manages coding session metadata, issues per-session JWTs, and exposes the secured Yjs WebSocket gateway used by the Monaco editor. Redis stores session snapshots and participant presence while the gateway (`@y/websocket-server`) syncs document updates.
 
-## Features Implemented
+## Tech Stack
+- Express + TypeScript
+- Redis (sessions + presence)
+- @y/websocket-server (Yjs)
+- Zod for schema validation
+- Pino logger
 
-- **Session lifecycle API** – `POST /api/v1/sessions` creates a session, stores metadata in Redis, and seeds presence state for both participants. `GET /api/v1/sessions/:id` returns the latest snapshot.
-- **Token issuance** – `POST /api/v1/sessions/:id/token` validates a participant’s Supabase JWT via `user_service` (`/auth/token/validate`) before minting a short-lived session JWT.
-- **WebSocket/Yjs gateway** – Authenticated clients connect to `wss://<host>/collab/{sessionId}` with the issued session token. The gateway verifies the JWT, checks Redis session state, and then hands the connection to `@y/websocket-server` which manages the shared Yjs document and awareness updates.
-- **Presence tracking** – Connections call back into `SessionManager` on connect, heartbeat, and disconnect so Redis presence hashes stay fresh. Sessions remain alive while at least one participant is connected, and a five-minute grace window applies if both disconnect.
-- **Question selector stub** – Currently returns placeholder data; ready to be swapped with an actual question service once available.
+## Capabilities
+- `POST /api/v1/sessions` – create session snapshots requested by the matching service
+- `GET /api/v1/sessions/:sessionId` – retrieve stored snapshot (question, documents, participants)
+- `POST /api/v1/sessions/:sessionId/token` – validate Supabase token via user service then mint session-scoped JWT
+- Authenticated WebSocket endpoint `ws(s)://<host>/collab/{sessionId}` for Yjs synchronization
+- Grace-period expiry handling: sessions soft-close if both users disconnect for the configured timeout
+- Session history export: when a session ends, Yjs docs are persisted to the user service history API
 
-## Project Structure
-
-```
-src/
-  app.ts                     # Express bootstrap, middleware stack
-  server.ts                  # Service entrypoint (Redis + HTTP + WebSocket wiring)
-  config/                    # Env parsing and typed config accessors
-  controllers/               # SessionController (REST handlers)
-  middleware/                # Zod-based request validators
-  repositories/              # RedisSessionRepository + RedisPresenceRepository
-  schemas/                   # Shared Zod schemas + inferred DTO types
-  services/                  # SessionManager, stub Question client
-  websocket/                 # Collaboration gateway (JWT auth + Yjs hookup)
-  types/                     # Ambient type declarations (e.g., y-websocket-server)
-```
-
-## Getting Started
-
-1. Ensure Redis is available (default `redis://localhost:6379`).
-2. Duplicate `.env.example` to `.env` (or set env vars) and update URLs/secrets.
-3. Install dependencies from repo root:
-
+## Running with Docker Compose
+1. Copy `collaboration_service/.env.example` to `.env`. Set:
+   - `REDIS_URL` (matches Docker compose service `redis`)
+   - `USER_SERVICE_URL` / `QUESTION_SERVICE_URL`
+   - `USER_SERVICE_INTERNAL_KEY`
+   - `JWT_SECRET`
+2. Start services:
    ```bash
-   npm install
+   docker compose up --build collaboration redis user question
    ```
+   (or `docker compose up --build` for the full stack).  
+3. REST API: `http://localhost:4010`, WebSocket base `ws://localhost:4010/collab`.
 
-4. Start the service:
+## Running Individually
+```bash
+npm install
+npm run dev --workspace collaboration_service
+```
+Build/start:
+```bash
+npm run build --workspace collaboration_service
+npm run start --workspace collaboration_service
+```
+Ensure Redis is running locally (`redis://localhost:6379`) or override via `.env`.
 
-   ```bash
-   npm run dev --workspace collaboration_service
-   ```
+## Environment Variables
+| Variable | Description |
+| --- | --- |
+| `PORT` / `HOST` | HTTP bind settings |
+| `REDIS_URL` | Redis connection |
+| `QUESTION_SERVICE_URL` | Used when seeding question details |
+| `USER_SERVICE_URL` | Used for Supabase token validation |
+| `USER_SERVICE_INTERNAL_KEY` | Shared key for calling user-service history endpoints |
+| `JWT_SECRET` | Signing key for session JWTs |
+| `SESSION_TOKEN_TTL_SECONDS` | Session token lifetime (default 300) |
+| `SESSION_GRACE_PERIOD_SECONDS` | Disconnection grace window (default 300) |
+| `COLLAB_WS_BASE_URL` | Advertised WebSocket URL |
+| `LOG_LEVEL` | Logger verbosity |
 
-   The HTTP API listens on `http://localhost:4010` by default; the WebSocket gateway shares the same host.
-
-### Environment Variables
-
-| Variable | Default | Description |
-| --- | --- | --- |
-| `PORT` | `4010` | HTTP port. |
-| `HOST` | `0.0.0.0` | Bind address. |
-| `REDIS_URL` | `redis://localhost:6379` | Redis connection string. |
-| `QUESTION_SERVICE_URL` | `http://localhost:4003/api/v1` | Placeholder for future integration. |
-| `USER_SERVICE_URL` | `http://localhost:4001/api/v1` | Used for token validation. |
-| `JWT_SECRET` | `dev-change-me` | Secret for session JWT signing/verification. |
-| `SESSION_TOKEN_TTL_SECONDS` | `300` | Duration of issued session tokens. |
-| `SESSION_GRACE_PERIOD_SECONDS` | `300` | How long to keep sessions alive once both users disconnect. |
-| `COLLAB_WS_BASE_URL` | `ws://localhost:4010/collab` | Advertised WebSocket endpoint. |
-| `LOG_LEVEL` | `debug` (non-prod) | Logger verbosity. |
-
-## REST API Summary
-
+## API Summary
 | Method & Path | Description |
 | --- | --- |
-| `POST /api/v1/sessions` | Matching service call to create a session. Returns `sessionId`, `question`, and initial `expiresAt`. |
-| `GET /api/v1/sessions/:sessionId` | Retrieve session snapshot from Redis. |
-| `POST /api/v1/sessions/:sessionId/token` | Participant request for a session JWT (requires Supabase access token). |
-| `GET /api/v1/health` | Basic health probe. |
+| `POST /api/v1/sessions` | Create session (called by matching service) |
+| `GET /api/v1/sessions/:sessionId` | Fetch current snapshot |
+| `POST /api/v1/sessions/:sessionId/token` | Mint session JWT for participant |
+| `GET /health` | Health probe |
 
-> See `src/schemas/session.ts` and `docs/api-contracts-and-models.md` for detailed payloads.
+WebSocket clients connect to `ws://<host>/collab/{sessionId}?token=<sessionJWT>` (or via `Authorization: Bearer`). The gateway verifies the token, updates presence, and attaches the socket to `session:{sessionId}` Yjs doc names (`session:<id>/state`, `session:<id>/lang/<language>`).
 
-## WebSocket Flow
-
-1. Client obtains session token via REST call.
-2. Connect to `wss://<host>/collab/{sessionId}` with header `Authorization: Bearer <sessionToken>` (or `?token=` query).
-3. Gateway verifies JWT, ensures user is part of the session, and delegates to `setupWSConnection`.
-4. Yjs document `session:{sessionId}` is created (if not already) and shared updates are synced.
-5. Presence heartbeats keep Redis state aligned; disconnects trigger grace-period handling.
-
-## Scripts
-
-| Command | Description |
-| --- | --- |
-| `npm run dev --workspace collaboration_service` | Start with hot reload via `tsx`. |
-| `npm run build --workspace collaboration_service` | TypeScript build to `dist/`. |
-| `npm run start --workspace collaboration_service` | Run the compiled build. |
-
-## What’s Next
-
-- Replace the question stub with real question-service integration.
-- Add metrics/logging around WebSocket usage and failures.
-- Integrate the frontend Monaco/Yjs client once ready.
-- Explore persistence (e.g., y-redis) to support multi-instance deployments.
-
-## References
-
-- `docs/` directory contains ADRs, API contracts, architecture outline, and implementation checklist.
-- Yjs provider documentation: [y-websocket](https://github.com/yjs/y-websocket).
+See `src/services/sessionManager.ts` and `src/websocket/collaborationGateway.ts` for lifecycle details.
