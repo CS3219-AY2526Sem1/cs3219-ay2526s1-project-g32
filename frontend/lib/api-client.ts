@@ -1,4 +1,4 @@
-﻿const API_BASE_URL = process.env.NEXT_PUBLIC_USER_SERVICE_URL ?? 'http://localhost:4001/api/v1';
+const API_BASE_URL = process.env.NEXT_PUBLIC_USER_SERVICE_URL ?? 'http://localhost:4001/api/v1';
 const MATCHING_SERVICE_URL = process.env.NEXT_PUBLIC_MATCHING_SERVICE_URL ?? 'http://localhost:3002/api/v1/matching';
 const QUESTION_SERVICE_URL = process.env.NEXT_PUBLIC_QUESTION_SERVICE_URL ?? 'http://localhost:4003/api/v1/questions';
 const DEFAULT_VERIFY_REDIRECT =
@@ -405,5 +405,15 @@ export const getRandomQuestion = async (params?: {
     }),
   );
 };
-
-
+export const updatePassword = async (password: string, accessToken: string) =>
+  handleResponse<void>(
+    await fetch(withBaseUrl('/auth/password'), {
+      method: 'PATCH',
+      headers: {
+        ...jsonHeaders,
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({ password }),
+    }),
+  );
+  
