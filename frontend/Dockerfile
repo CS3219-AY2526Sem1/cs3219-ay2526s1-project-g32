@@ -1,8 +1,17 @@
 # Frontend (Next.js) Dockerfile - multi-stage
 FROM node:18.20.1-alpine AS deps
 WORKDIR /app
-COPY package*.json ./
-RUN if [ -f package-lock.json ]; then npm ci --prefer-offline --no-audit --no-fund; else npm install --no-audit --no-fund; fi
+# Copy only package.json to avoid using a lockfile generated on a different platform
+# which may contain platform-specific entries (eg. @next/swc-win32...). This forces
+# the image build to resolve dependencies for the build platform.
+COPY package.json ./
+## Ensure npm resolves platform-specific optional deps for the target image platform.
+## If a package-lock.json was generated on a different OS (eg. Windows), npm may try to install
+## platform-specific binaries for that OS (eg. @next/swc-win32...). Set the npm platform/arch
+## and skip optional dependencies to avoid EBADPLATFORM errors during image builds on arm64.
+ENV npm_config_platform=linux
+ENV npm_config_arch=arm64
+RUN npm install --no-optional --no-audit --no-fund
 
 FROM node:18.20.1-alpine AS builder
 WORKDIR /app
