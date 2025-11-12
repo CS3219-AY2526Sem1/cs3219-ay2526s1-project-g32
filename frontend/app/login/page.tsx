@@ -80,7 +80,17 @@ export default function LoginPage() {
             </Form.Item>
 
             {error ? (
-              <Alert type="error" showIcon message={error} style={{ marginBottom: 12 }} />
+              <Alert
+                type="error"
+                showIcon
+                message={error}
+                style={{
+                  marginBottom: 12,
+                  background: '#2a1517',
+                  borderColor: '#ff4d4f',
+                  color: '#fff',
+                }}
+              />
             ) : null}
 
             <Form.Item style={{ marginBottom: 0 }}>

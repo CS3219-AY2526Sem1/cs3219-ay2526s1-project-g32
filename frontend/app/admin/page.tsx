@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm, Controller } from 'react-hook-form';
+import type { ControllerRenderProps } from 'react-hook-form';
 import { 
   Alert,
   Button, 
@@ -47,6 +48,29 @@ const { Header, Content } = Layout;
 const { Title, Paragraph } = Typography;
 const { TextArea } = Input;
 
+const alertStyles = {
+  info: {
+    background: '#0f1c2e',
+    borderColor: '#1890ff',
+    color: '#e6f4ff',
+  },
+  warning: {
+    background: '#2b1f12',
+    borderColor: '#faad14',
+    color: '#fff4e6',
+  },
+  error: {
+    background: '#2a1517',
+    borderColor: '#ff4d4f',
+    color: '#fff1f0',
+  },
+  success: {
+    background: '#132a13',
+    borderColor: '#52c41a',
+    color: '#e8ffe8',
+  },
+};
+
 type FormValues = {
   title: string;
   slug: string;
@@ -58,6 +82,10 @@ type FormValues = {
   starter_cpp?: string;
   starter_java?: string;
   starter_javascript?: string;
+};
+
+type RenderFieldProps<TName extends keyof FormValues> = {
+  field: ControllerRenderProps<FormValues, TName>;
 };
 
 const LoadingView = () => (
@@ -489,10 +517,7 @@ export default function AdminPage() {
                           description="This will give the specified user full administrative privileges. Make sure you trust this user before granting admin access."
                           type="info"
                           showIcon
-                          style={{ 
-                            background: 'rgba(24, 144, 255, 0.1)',
-                            border: '1px solid rgba(24, 144, 255, 0.3)'
-                          }}
+                          style={alertStyles.info}
                         />
 
                         <Divider style={{ margin: '12px 0', borderColor: 'rgba(82, 196, 26, 0.2)' }} />
@@ -536,6 +561,7 @@ export default function AdminPage() {
                             showIcon
                             closable
                             onClose={() => setError(null)}
+                            style={alertStyles.error}
                           />
                         )}
                         
@@ -547,6 +573,7 @@ export default function AdminPage() {
                             showIcon
                             closable
                             onClose={() => setSuccess(null)}
+                            style={alertStyles.success}
                           />
                         )}
                       </Space>
@@ -573,10 +600,7 @@ export default function AdminPage() {
                           type="warning"
                           showIcon
                           icon={<WarningOutlined />}
-                          style={{ 
-                            background: 'rgba(250, 173, 20, 0.1)',
-                            border: '1px solid rgba(250, 173, 20, 0.3)'
-                          }}
+                          style={alertStyles.warning}
                         />
 
                         <Divider style={{ margin: '12px 0', borderColor: 'rgba(255, 77, 79, 0.2)' }} />
@@ -616,6 +640,7 @@ export default function AdminPage() {
                             showIcon
                             closable
                             onClose={() => setError(null)}
+                            style={alertStyles.error}
                           />
                         )}
                         
@@ -627,6 +652,7 @@ export default function AdminPage() {
                             showIcon
                             closable
                             onClose={() => setSuccess(null)}
+                            style={alertStyles.success}
                           />
                         )}
                       </Space>
@@ -682,11 +708,11 @@ export default function AdminPage() {
                       help={errors.title?.message}
                       required={!isEditMode}
                     >
-                      <Controller
+                      <Controller<FormValues, 'title'>
                         name="title"
                         control={control}
                         rules={{ required: isEditMode ? false : 'Title is required' }}
-                        render={({ field }) => (
+                        render={({ field }: RenderFieldProps<'title'>) => (
                           <Input
                             {...field}
                             size="large"
@@ -703,7 +729,7 @@ export default function AdminPage() {
                       help={errors.slug?.message || 'URL-friendly identifier (e.g., two-sum)'}
                       required={!isEditMode}
                     >
-                      <Controller
+                      <Controller<FormValues, 'slug'>
                         name="slug"
                         control={control}
                         rules={{ 
@@ -713,7 +739,7 @@ export default function AdminPage() {
                             message: 'Slug must be lowercase letters, numbers, and hyphens only'
                           }
                         }}
-                        render={({ field }) => (
+                        render={({ field }: RenderFieldProps<'slug'>) => (
                           <Input
                             {...field}
                             size="large"
@@ -730,11 +756,11 @@ export default function AdminPage() {
                       help={errors.difficulty?.message}
                       required={!isEditMode}
                     >
-                      <Controller
+                      <Controller<FormValues, 'difficulty'>
                         name="difficulty"
                         control={control}
                         rules={{ required: isEditMode ? false : 'Difficulty is required' }}
-                        render={({ field }) => (
+                        render={({ field }: RenderFieldProps<'difficulty'>) => (
                           <Select
                             {...field}
                             size="large"
@@ -755,17 +781,17 @@ export default function AdminPage() {
                       help={errors.topics?.message || 'Press Enter to add each topic'}
                       required={!isEditMode}
                     >
-                      <Controller
+                      <Controller<FormValues, 'topics'>
                         name="topics"
                         control={control}
                         rules={{ 
                           required: isEditMode ? false : 'At least one topic is required',
-                          validate: (value) => {
+                          validate: (value: string[]) => {
                             if (isEditMode) return true;
                             return value.length > 0 || 'At least one topic is required';
                           }
                         }}
-                        render={({ field }) => (
+                        render={({ field }: RenderFieldProps<'topics'>) => (
                           <Select
                             {...field}
                             mode="tags"
@@ -785,7 +811,7 @@ export default function AdminPage() {
                       help={errors.description?.message || 'Full problem description (supports markdown)'}
                       required={!isEditMode}
                     >
-                      <Controller
+                      <Controller<FormValues, 'description'>
                         name="description"
                         control={control}
                         rules={{ 
@@ -795,7 +821,7 @@ export default function AdminPage() {
                             message: 'Description must be at least 10 characters'
                           }
                         }}
-                        render={({ field }) => (
+                        render={({ field }: RenderFieldProps<'description'>) => (
                           <TextArea
                             {...field}
                             rows={8}
@@ -818,10 +844,10 @@ export default function AdminPage() {
                     </Paragraph>
 
                     <Form.Item label="Python">
-                      <Controller
+                      <Controller<FormValues, 'starter_python'>
                         name="starter_python"
                         control={control}
-                        render={({ field }) => (
+                        render={({ field }: RenderFieldProps<'starter_python'>) => (
                           <TextArea
                             {...field}
                             rows={4}
@@ -833,10 +859,10 @@ export default function AdminPage() {
                     </Form.Item>
 
                     <Form.Item label="JavaScript">
-                      <Controller
+                      <Controller<FormValues, 'starter_javascript'>
                         name="starter_javascript"
                         control={control}
-                        render={({ field }) => (
+                        render={({ field }: RenderFieldProps<'starter_javascript'>) => (
                           <TextArea
                             {...field}
                             rows={4}
@@ -848,10 +874,10 @@ export default function AdminPage() {
                     </Form.Item>
 
                     <Form.Item label="Java">
-                      <Controller
+                      <Controller<FormValues, 'starter_java'>
                         name="starter_java"
                         control={control}
-                        render={({ field }) => (
+                        render={({ field }: RenderFieldProps<'starter_java'>) => (
                           <TextArea
                             {...field}
                             rows={4}
@@ -863,10 +889,10 @@ export default function AdminPage() {
                     </Form.Item>
 
                     <Form.Item label="C++">
-                      <Controller
+                      <Controller<FormValues, 'starter_cpp'>
                         name="starter_cpp"
                         control={control}
-                        render={({ field }) => (
+                        render={({ field }: RenderFieldProps<'starter_cpp'>) => (
                           <TextArea
                             {...field}
                             rows={4}
@@ -878,10 +904,10 @@ export default function AdminPage() {
                     </Form.Item>
 
                     <Form.Item label="C">
-                      <Controller
+                      <Controller<FormValues, 'starter_c'>
                         name="starter_c"
                         control={control}
-                        render={({ field }) => (
+                        render={({ field }: RenderFieldProps<'starter_c'>) => (
                           <TextArea
                             {...field}
                             rows={4}
@@ -895,10 +921,24 @@ export default function AdminPage() {
 
                   {/* Error/Success Messages */}
                   {error && (
-                    <Alert type="error" showIcon message={error} closable onClose={() => setError(null)} />
+                    <Alert
+                      type="error"
+                      showIcon
+                      message={error}
+                      closable
+                      onClose={() => setError(null)}
+                      style={alertStyles.error}
+                    />
                   )}
                   {success && (
-                    <Alert type="success" showIcon message={success} closable onClose={() => setSuccess(null)} />
+                    <Alert
+                      type="success"
+                      showIcon
+                      message={success}
+                      closable
+                      onClose={() => setSuccess(null)}
+                      style={alertStyles.success}
+                    />
                   )}
 
                   {/* Action Buttons */}

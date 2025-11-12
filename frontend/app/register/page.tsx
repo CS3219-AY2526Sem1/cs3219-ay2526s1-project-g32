@@ -117,10 +117,30 @@ export default function RegisterPage() {
             </Form.Item>
 
             {error ? (
-              <Alert type="error" showIcon message={error} style={{ marginBottom: 12 }} />
+              <Alert
+                type="error"
+                showIcon
+                message={error}
+                style={{
+                  marginBottom: 12,
+                  background: '#2a1517',
+                  borderColor: '#ff4d4f',
+                  color: '#fff',
+                }}
+              />
             ) : null}
             {success ? (
-              <Alert type="success" showIcon message={success} style={{ marginBottom: 12 }} />
+              <Alert
+                type="success"
+                showIcon
+                message={success}
+                style={{
+                  marginBottom: 12,
+                  background: '#132a13',
+                  borderColor: '#52c41a',
+                  color: '#e8ffe8',
+                }}
+              />
             ) : null}
 
             <Form.Item style={{ marginBottom: 0 }}>
