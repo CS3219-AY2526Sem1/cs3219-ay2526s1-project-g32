@@ -1,3 +1,7 @@
+# AI Assistance Disclosure:
+# Scope: Generated GitHub Actions workflow for Docker build and publish of services
+# Author Review: Validated for style and accuracy.
+
 name: Docker Build & Publish
 
 on:
