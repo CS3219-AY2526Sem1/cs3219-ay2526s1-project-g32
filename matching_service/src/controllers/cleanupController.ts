@@ -1,3 +1,8 @@
+/* AI Assistance Disclosure:
+Scope: Implementation of handlers.
+Author Review: Validated for style and accuracy.
+*/
+
 import { Request, Response } from 'express';
 import redisClient from '../redisClient';
 

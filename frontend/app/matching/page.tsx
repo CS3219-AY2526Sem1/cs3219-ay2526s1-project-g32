@@ -1,3 +1,9 @@
+/* AI Assistance Disclosure:
+Scope: Implement frontend matching page with topic/difficulty selection, 
+matchmaking initiation, polling, and cancellation with initial design made by team.
+Author Review: Validated for style and accuracy.
+*/
+
 'use client';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';

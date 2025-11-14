@@ -58,3 +58,13 @@ Stateless Express service that pairs users based on requested topic/difficulty. 
 5. Clients poll the status endpoint until they receive `success` (with sessionId) or `not_found`.
 
 Refer to `src/controllers/matchingControllers.ts` and `src/services/queueService.ts` for implementation details.
+
+### Service-Level (User) AI Disclosure
+AI Tools: ChatGPT, GitHub Copilot
+
+Summary: Generated implementation of features and bug fixes for the Matching Service based on prespecified requirements services that we chose to use. (Queue, timeout lifecycle, atomic queue operations, RabitMQ temp-queue improvements, cancellation flow)
+
+Restricted Scope: Design decision or requirement related work was not done with AI assistance
+
+Validation: Any code that was generated was done incrementally, and validated for correctness and logic at every step. I checked for suitability and verified behaviour in local testing.
+

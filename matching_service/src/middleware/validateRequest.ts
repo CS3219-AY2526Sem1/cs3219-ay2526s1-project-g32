@@ -1,3 +1,8 @@
+/* AI Assistance Disclosure:
+Scope: Implementation of validateRequest function.
+Author Review: Validated for style and accuracy.
+*/
+
 import { Request, Response, NextFunction } from 'express';
 import { z, ZodError } from 'zod';
 

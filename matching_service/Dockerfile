@@ -1,3 +1,7 @@
+# AI Assistance Disclosure:
+# Scope: Implementation of Dockerfile build for Matching Service.
+# Author Review: Validated for style and accuracy.
+
 # Matching Service Dockerfile - multi-stage
 FROM node:18.20.1-alpine AS builder
 WORKDIR /app

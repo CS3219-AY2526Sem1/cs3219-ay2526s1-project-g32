@@ -1,3 +1,8 @@
+/* AI Assistance Disclosure:
+Scope: Generation of boilerplate code for matchmaking routes.
+Author Review: Validated for style and accuracy.
+*/
+
 import { Router } from 'express';
 import { 
     createMatchRequest, 

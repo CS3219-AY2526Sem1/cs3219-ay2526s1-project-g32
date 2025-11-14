@@ -1,3 +1,8 @@
+/* AI Assistance Disclosure:
+Scope: Implementation of Redis client setup
+Author Review: Validated for style and accuracy.
+*/
+
 /**
  * Sets up and exports a reusable Redis client instance.
  * This ensures that we only have one connection to the Redis server

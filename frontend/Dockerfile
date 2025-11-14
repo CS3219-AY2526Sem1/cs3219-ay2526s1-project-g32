@@ -1,3 +1,7 @@
+# AI Assistance Disclosure:
+# Scope: Implementation of Dockerfile build for Frontend (Next.js).
+# Author Review: Validated for style and accuracy.
+
 # Frontend (Next.js) Dockerfile - multi-stage
 FROM node:18.20.1-alpine AS deps
 WORKDIR /app

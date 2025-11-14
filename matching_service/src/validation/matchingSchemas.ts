@@ -1,3 +1,8 @@
+/* AI Assistance Disclosure:
+Scope: Generate boilerplate for validation schemas based on predefined requirements.
+Author Review: Validated for style and accuracy.
+*/
+
 import { z } from 'zod';
 
 // Define valid difficulty levels
