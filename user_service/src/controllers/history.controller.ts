@@ -1,3 +1,8 @@
+/* AI Assistance Disclosure:
+Scope: Implementation of handlers.
+Author Review: Validated for style and accuracy.
+*/
+
 import type { NextFunction, Response } from 'express';
 
 import type { AuthenticatedRequest } from '../middleware/authenticate';

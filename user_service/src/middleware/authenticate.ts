@@ -1,3 +1,8 @@
+/* AI Assistance Disclosure:
+Scope: Implementation of authenticate() function.
+Author Review: Validated for style and accuracy.
+*/
+
 import type { NextFunction, Request, Response } from 'express';
 import jwt, { type JwtPayload } from 'jsonwebtoken';
 

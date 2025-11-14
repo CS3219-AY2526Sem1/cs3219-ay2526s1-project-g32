@@ -1,3 +1,8 @@
+/* AI Assistance Disclosure:
+Scope: Implementation of session attempt creation and retrieval.
+Author Review: Validated for style and accuracy.
+*/
+
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 import { supabaseAdminClient } from '../services/supabaseClient';

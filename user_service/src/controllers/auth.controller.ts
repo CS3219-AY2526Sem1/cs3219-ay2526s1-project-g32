@@ -1,4 +1,9 @@
-﻿import type { NextFunction, Request, Response } from 'express';
+﻿/* AI Assistance Disclosure:
+Scope: Implementation of handlers.
+Author Review: Validated for style and accuracy.
+*/
+
+import type { NextFunction, Request, Response } from 'express';
 import jwt, { type JwtPayload, JsonWebTokenError, TokenExpiredError } from 'jsonwebtoken';
 
 import {
