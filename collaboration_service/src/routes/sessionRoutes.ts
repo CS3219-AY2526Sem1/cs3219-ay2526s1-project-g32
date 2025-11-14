@@ -1,3 +1,8 @@
+/* AI Assistance Disclosure:
+Scope: Debug /sessions/:sessionId endpoints.
+Author Review: Validated for style and accuracy.
+*/
+
 import { Router } from 'express';
 
 import {

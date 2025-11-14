@@ -1,3 +1,8 @@
+/* AI Assistance Disclosure:
+Scope: Debug parse port and allowed origin logic.
+Author Review: Validated for style and accuracy.
+*/
+
 import { env } from './env';
 
 const parsePort = (value: string | undefined): number => {

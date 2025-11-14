@@ -1,3 +1,8 @@
+/* AI Assistance Disclosure:
+Scope: Implement WSSharedDoc.
+Author Review: Validated for style and accuracy.
+*/
+
 declare module '@y/websocket-server/utils' {
   import type { IncomingMessage } from 'http';
   import type { WebSocket } from 'ws';

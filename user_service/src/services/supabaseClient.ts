@@ -1,3 +1,8 @@
+/* AI Assistance Disclosure:
+Scope: Setup Supabase Client metadata.
+Author Review: Validated for style and accuracy.
+*/
+
 import { createClient } from '@supabase/supabase-js';
 
 import { config } from '../config';

@@ -1,3 +1,8 @@
+/* AI Assistance Disclosure:
+Scope: Implement API client functions for lightweight wrapper to pass to pages.
+Author Review: Validated for style and accuracy.
+*/
+
 const QUESTION_SERVICE_BASE_URL =
   process.env.NEXT_PUBLIC_QUESTION_SERVICE_URL ?? 'http://localhost:4003/api/v1/questions';
 

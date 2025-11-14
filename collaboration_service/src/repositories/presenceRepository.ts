@@ -1,3 +1,8 @@
+/* AI Assistance Disclosure:
+Scope: Implement RedisPresenceRepository.
+Author Review: Validated for style and accuracy.
+*/
+
 import type { Redis } from 'ioredis';
 
 import type { PresenceRecord } from '../types';

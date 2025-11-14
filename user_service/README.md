@@ -78,3 +78,12 @@ The frontend includes an `/admin` dashboard which relies on the user service’s
 - Requires `NEXT_PUBLIC_QUESTION_SERVICE_URL` in the frontend `.env` (default `http://localhost:4003/api/v1/questions`).
 - Question service exposes `GET /api/v1/questions/slug/:slug` for edit/delete flows.
 - Starter-code fields exist for Python, JavaScript, Java, C++, and C.
+
+### Service-Level (User) AI Disclosure
+AI Tools: GPT-5-Codex
+
+Summary: AI tools were used in generating boilerplate code based on author-designed architecture, author-designed API endpoints and services. It was also used for debugging purposes and providing error explanations, assisting in finding the root cause of the problems.
+
+Restricted Scope: No requirements work or design-related work was handed to AI tools.
+
+Validation: Any code that was generated was done incrementally, and validated for correctness and logic at every step.

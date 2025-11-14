@@ -1,3 +1,8 @@
+/* AI Assistance Disclosure:
+Scope: Implement collaboration helper methods.
+Author Review: Validated for style and accuracy.
+*/
+
 import type { IncomingMessage, Server as HttpServer } from 'http';
 import type { Socket } from 'net';
 import jwt, { type JwtPayload } from 'jsonwebtoken';

@@ -1,3 +1,8 @@
+/* AI Assistance Disclosure:
+Scope: Implement useRequireAuth().
+Author Review: Validated for style and accuracy.
+*/
+
 'use client';
 
 import type { Route } from 'next';

@@ -1,3 +1,8 @@
+/* AI Assistance Disclosure:
+Scope: Implement and debug page components and toggle functionality.
+Author Review: Validated for style and accuracy.
+*/
+
 'use client';
 
 import { useEffect, useState } from 'react';

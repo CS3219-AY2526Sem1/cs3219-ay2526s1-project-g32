@@ -1,3 +1,8 @@
+/* AI Assistance Disclosure:
+Scope: Implement and refactor API client functions for lightweight wrapper to pass to pages.
+Author Review: Validated for style and accuracy.
+*/
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_USER_SERVICE_URL ?? 'http://localhost:4001/api/v1';
 const MATCHING_SERVICE_URL = process.env.NEXT_PUBLIC_MATCHING_SERVICE_URL ?? 'http://localhost:3002/api/v1/matching';
 const QUESTION_SERVICE_URL = process.env.NEXT_PUBLIC_QUESTION_SERVICE_URL ?? 'http://localhost:4003/api/v1/questions';

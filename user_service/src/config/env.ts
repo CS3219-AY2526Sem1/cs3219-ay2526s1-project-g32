@@ -1,3 +1,8 @@
+/* AI Assistance Disclosure:
+Scope: Setup repo and service environment path.
+Author Review: Validated for style and accuracy.
+*/
+
 import { config as loadEnv } from 'dotenv';
 import { existsSync } from 'fs';
 import path from 'path';

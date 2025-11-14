@@ -1,3 +1,8 @@
+/* AI Assistance Disclosure:
+Scope: Implementation of authentication service logic and integration with Supabase library.
+Author Review: Validated for style and accuracy.
+*/
+
 import type { AuthResponse, User } from '@supabase/supabase-js';
 
 import { HttpError } from '../utils/httpError';

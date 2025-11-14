@@ -1,3 +1,8 @@
+/* AI Assistance Disclosure:
+Scope: Implement and debug page components, and standardize theme with globals.
+Author Review: Validated for style and accuracy.
+*/
+
 'use client';
 
 import { useRouter } from 'next/navigation';

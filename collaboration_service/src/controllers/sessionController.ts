@@ -1,3 +1,8 @@
+/* AI Assistance Disclosure:
+Scope: Implement SessionController.
+Author Review: Validated for style and accuracy.
+*/
+
 import type { Request, Response, NextFunction } from 'express';
 
 import {

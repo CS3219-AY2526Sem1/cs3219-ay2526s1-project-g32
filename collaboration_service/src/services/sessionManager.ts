@@ -1,3 +1,8 @@
+/* AI Assistance Disclosure:
+Scope: Implement and debug SessionManager.
+Author Review: Validated for style and accuracy.
+*/
+
 import jwt from 'jsonwebtoken';
 import { v4 as uuidv4 } from 'uuid';
 

@@ -1,3 +1,8 @@
+/* AI Assistance Disclosure:
+Scope: Implement consistent themes.
+Author Review: Validated for style and accuracy.
+*/
+
 import type { ThemeConfig } from 'antd';
 
 // Shared theme configuration for consistent styling across all pages
