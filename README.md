@@ -90,3 +90,56 @@ The override file mounts your source tree so changes trigger the dev servers aut
 docker compose -f docker-compose.yml up --build -d
 ```
 This uses the production builds produced by each Dockerfile. Stop containers with `docker compose down`.
+
+## Setting Up Supabase
+This project relies on three Supabase tables. Create them (or adapt to your schema) before running the services:
+
+### questions
+```sql
+CREATE TABLE public.questions (
+  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  title TEXT NOT NULL,
+  slug TEXT NOT NULL UNIQUE,
+  description TEXT NOT NULL,
+  difficulty TEXT NOT NULL CHECK (difficulty IN ('Easy','Medium','Hard')),
+  topics JSONB NOT NULL DEFAULT '[]'::jsonb,
+  starter_python TEXT,
+  starter_c TEXT,
+  starter_cpp TEXT,
+  starter_java TEXT,
+  starter_javascript TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+```
+
+### session_attempts
+```sql
+CREATE TABLE public.session_attempts (
+  id UUID PRIMARY KEY,
+  match_id TEXT,
+  question_id BIGINT,
+  question_title TEXT,
+  started_at TIMESTAMPTZ,
+  ended_at TIMESTAMPTZ,
+  code_python TEXT,
+  code_c TEXT,
+  code_cpp TEXT,
+  code_java TEXT,
+  code_javascript TEXT,
+  participants JSONB
+);
+```
+
+### user_attempts
+```sql
+CREATE TABLE public.user_attempts (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID NOT NULL,
+  session_attempt_id UUID NOT NULL REFERENCES public.session_attempts(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE (user_id, session_attempt_id)
+);
+```
+
+> **Note:** The question service auto-seeds the `questions` table with a small sample set the first time you call `GET /api/v1/questions` on an empty database, so fresh deployments have data immediately.
+
