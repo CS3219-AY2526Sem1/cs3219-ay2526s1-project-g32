@@ -1,3 +1,7 @@
+# AI Assistance Disclosure:
+# Scope: Implementation of docker-compose override for development environment.
+# Author Review: Validated for style and accuracy.
+
 version: '3.8'
 
 services:

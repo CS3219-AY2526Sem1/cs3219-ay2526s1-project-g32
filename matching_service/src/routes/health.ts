@@ -1,3 +1,8 @@
+/* AI Assistance Disclosure:
+Scope: Implementation of health check endpoint.
+Author Review: Validated for style and accuracy.
+*/
+
 import { Router, Request, Response } from 'express';
 import redisClient from '../redisClient';
 

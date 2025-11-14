@@ -1,3 +1,8 @@
+/* AI Assistance Disclosure:
+Scope: Implementation of authenticate function.
+Author Review: Validated for style and accuracy.
+*/
+
 import { Request, Response, NextFunction } from 'express';
 import axios from 'axios';
 

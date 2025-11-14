@@ -1,3 +1,8 @@
+/* AI Assistance Disclosure:
+Scope: Implementation of matchmaking queue service logic using Redis.
+Author Review: Validated for style and accuracy.
+*/
+
 /**
  * QueueService
  * This service class encapsulates all the logic for interacting with the Redis queues.

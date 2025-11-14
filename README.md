@@ -143,3 +143,16 @@ CREATE TABLE public.user_attempts (
 
 > **Note:** The question service auto-seeds the `questions` table with a small sample set the first time you call `GET /api/v1/questions` on an empty database, so fresh deployments have data immediately.
 
+
+### Project‑Level Disclosure 
+AI Use Summary
+Tools: ChatGPT, GitHub Copilot, Codex
+Prohibited phases avoided: Requirement formulation; architecture/design decisions.
+Allowed uses:
+- Generated implementation based on specified architecture
+- Modified behaviour to fit requirements/features
+- Aided in containerisation for each service as well as frontend
+- Used to analyse errors and assist in debugging
+
+Verification: All AI outputs reviewed, edited, and tested by the authors.
+Usage Instances: Copilot and Codex was used in the process of implementation, and all files were analysed in its generation process, as well as majority of files having some form of AI generation.

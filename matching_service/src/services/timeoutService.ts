@@ -1,3 +1,8 @@
+/* AI Assistance Disclosure:
+Scope: Implementation of timeout service logic using RabbitMQ and Redis.
+Author Review: Validated for style and accuracy.
+*/
+
 /**
  * This service is responsible for handling request timeouts using an event-driven
  * approach with RabbitMQ. It schedules a delayed message for each new match

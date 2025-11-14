@@ -1,3 +1,10 @@
+/* AI Assistance Disclosure:
+Scope: Implement frontend waiting page for matching process 
+with polling and cancellation based on initial designs team made
+Author Review: Validated for style and accuracy.
+*/
+
+
 'use client';
 
 import { useEffect, useState, useRef } from 'react';

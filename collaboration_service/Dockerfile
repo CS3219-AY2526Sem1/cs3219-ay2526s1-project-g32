@@ -1,3 +1,8 @@
+# AI Assistance Disclosure:
+# Scope: Implementation of Dockerfile build for Collaboration Service.
+# Author Review: Validated for style and accuracy.
+
+
 # Collaboration Service Dockerfile - multi-stage
 FROM node:18.20.1-alpine AS builder
 WORKDIR /app

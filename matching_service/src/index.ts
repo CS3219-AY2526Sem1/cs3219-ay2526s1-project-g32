@@ -1,3 +1,8 @@
+/* AI Assistance Disclosure:
+Scope: Implement main entry point for Matching Service with Express server setup.
+Author Review: Validated for style and accuracy.
+*/
+
 /**
  * Main entry point for the Matching Service.
  * This file sets up the Express server, initializes a connection to RabbitMQ,
