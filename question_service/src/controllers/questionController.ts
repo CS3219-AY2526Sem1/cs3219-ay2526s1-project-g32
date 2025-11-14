@@ -1,3 +1,8 @@
+/* AI Assistance Disclosure:
+Scope: Implementation of functions.
+Author Review: Validated for style and accuracy.
+*/
+
 import { Request, Response } from "express";
 import QuestionService, { QuestionCreationAttributes } from "../models/Question";
 import supabase from "../models/db";

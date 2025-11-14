@@ -1,3 +1,8 @@
+/* AI Assistance Disclosure:
+Scope: Create mapping function based on question schema provided.
+Author Review: Validated for style and accuracy.
+*/
+
 import supabase from "./db";
 
 // Database row interface (matches Supabase questions table structure)

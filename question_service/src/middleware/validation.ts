@@ -1,3 +1,8 @@
+/* AI Assistance Disclosure:
+Scope: Create scaffolding.
+Author Review: Validated for style and accuracy.
+*/
+
 import { Request, Response, NextFunction } from 'express';
 import { z, ZodSchema } from 'zod';
 import { logger } from '../utils/logger';

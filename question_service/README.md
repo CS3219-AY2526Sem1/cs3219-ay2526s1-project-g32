@@ -60,3 +60,12 @@ npm run start --workspace question_service
 - This gives fresh deployments some data immediately; once seeded, normal CRUD and Supabase exports work as usual.
 
 Payload schemas live in `src/validation/schemas.ts`; controller implementations are under `src/controllers/questionController.ts`.
+
+### Service-Level (Question) AI Disclosure
+AI Tools: Claude Sonnet 4.5
+
+Summary: AI tools were used in generating boilerplate code based on author-designed architecture, author-designed API endpoints and services. It was also used for debugging purposes and providing error explanations, assisting in finding the root cause of the problems.
+
+Restricted Scope: No requirements work or design-related work was handed to AI tools.
+
+Validation: Any code that was generated was done incrementally, and validated for correctness and logic at every step.
