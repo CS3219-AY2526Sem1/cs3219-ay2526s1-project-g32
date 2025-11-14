@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import QuestionService, { QuestionCreationAttributes } from "../models/Question";
 import supabase from "../models/db";
 import { logger } from "../utils/logger";
+import { sampleQuestions } from "../seeds/sampleQuestions";
 import {
   CreateQuestionInput,
   UpdateQuestionInput,
@@ -72,21 +73,54 @@ export const getQuestions = async (req: Request, res: Response): Promise<void> =
     const { title, difficulty, topic } = req.query;
     const topicFilters = normalizeTopicFilters(topic);
 
-    let query = supabase
-      .from('questionsv3')
-      .select('*')
-      .order('id', { ascending: true });
+    const buildQuery = () => {
+      let query = supabase
+        .from('questions')
+        .select('*')
+        .order('id', { ascending: true });
 
-    if (title) {
-      query = query.ilike('title', `%${title}%`);
+      if (title) {
+        query = query.ilike('title', `%${title}%`);
+      }
+      if (difficulty) {
+        query = query.eq('difficulty', difficulty);
+      }
+
+      return query;
+    };
+
+    const executeQuery = async () => {
+      const { data, error } = await buildQuery();
+      if (error) throw error;
+      return data ?? [];
+    };
+
+    let data = await executeQuery();
+
+    if (data.length === 0 && !title && !difficulty && topicFilters.length === 0) { // if database is initially empty, seed sample questions
+      logger.info('Question bank empty; seeding sample questions');
+      const { error: seedError } = await supabase.from('questions').insert(
+        sampleQuestions.map((question) => ({
+          title: question.title,
+          slug: question.slug,
+          description: question.description,
+          difficulty: question.difficulty,
+          topics: question.topics,
+          starter_python: question.starter_python,
+          starter_c: question.starter_c,
+          starter_cpp: question.starter_cpp,
+          starter_java: question.starter_java,
+          starter_javascript: question.starter_javascript,
+        })),
+      );
+
+      if (seedError) {
+        logger.error({ err: seedError }, 'Failed to seed sample questions');
+        throw seedError;
+      }
+
+      data = await executeQuery();
     }
-    if (difficulty) {
-      query = query.eq('difficulty', difficulty);
-    }
-
-    const { data, error } = await query;
-
-    if (error) throw error;
     
     // Convert to API format
     const filteredData =
@@ -143,7 +177,7 @@ export const getQuestionBySlug = async (req: Request, res: Response): Promise<vo
     logger.info({ slug }, '[GET /slug/:slug] Fetching question by slug');
     
     const { data, error } = await supabase
-      .from('questionsv3')
+      .from('questions')
       .select('*')
       .eq('slug', slug)
       .single();
@@ -222,7 +256,7 @@ export const getRandomQuestion = async (req: Request, res: Response): Promise<vo
     logger.info({ difficulty, topic }, '[GET /random] Request params');
 
     let query = supabase
-      .from('questionsv3')
+      .from('questions')
       .select('*');
     
     if (difficulty) {

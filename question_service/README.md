@@ -1,7 +1,7 @@
 # PeerPrep – Question Service
 
 ## Overview
-Express + TypeScript API backed by Supabase Postgres (`questionsv3` table). Supplies CRUD endpoints for coding questions, filtering by difficulty/topic, and random question selection for the matching service.
+Express + TypeScript API backed by Supabase Postgres (`questions` table). Supplies CRUD endpoints for coding questions, filtering by difficulty/topic, and random question selection for the matching service.
 
 ## Tech Stack
 - Express + TypeScript
@@ -54,5 +54,9 @@ npm run start --workspace question_service
 | `GET /api/v1/questions/slug/:slug` | Fetch by slug |
 | `PUT /api/v1/questions/:id` | Update question |
 | `DELETE /api/v1/questions/:id` | Remove question |
+
+### Automatic Seeding
+- On the first `GET /api/v1/questions` (without filters), if the table is empty the service inserts a small built-in question set from `src/seeds/sampleQuestions.ts`.
+- This gives fresh deployments some data immediately; once seeded, normal CRUD and Supabase exports work as usual.
 
 Payload schemas live in `src/validation/schemas.ts`; controller implementations are under `src/controllers/questionController.ts`.

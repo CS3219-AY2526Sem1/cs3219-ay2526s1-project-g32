@@ -1,6 +1,6 @@
 import supabase from "./db";
 
-// Database row interface (matches Supabase questionsv3 table structure)
+// Database row interface (matches Supabase questions table structure)
 export interface QuestionRow {
   id: number;
   title: string;
@@ -47,7 +47,7 @@ export interface QuestionCreationAttributes {
 
 // Question service class for Supabase operations
 export class QuestionService {
-  private static readonly tableName = 'questionsv3';
+  private static readonly tableName = 'questions';
 
   // Convert database row to API format
   private static mapRowToAttributes(row: QuestionRow): QuestionAttributes {
