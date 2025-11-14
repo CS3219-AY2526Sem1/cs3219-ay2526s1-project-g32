@@ -1,3 +1,7 @@
+# AI Assistance Disclosure:
+# Scope: Generated GitHub Actions CI workflow for build and test of services
+# Author Review: Validated for style and accuracy.
+
 name: CI — build & test per service
 
 on:
