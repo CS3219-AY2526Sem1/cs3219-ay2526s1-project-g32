@@ -1,3 +1,8 @@
+/* AI Assistance Disclosure:
+Scope: Generation of validation schemas with predefined constraints.
+Author Review: Validated for style and accuracy.
+*/
+
 import { z } from 'zod';
 
 // Difficulty enum schema
