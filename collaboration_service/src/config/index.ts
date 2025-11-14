@@ -1,3 +1,8 @@
+/* AI Assistance Disclosure:
+Scope: Implement parsePositiveNumber due to bug and config.
+Author Review: Validated for style and accuracy.
+*/
+
 import { env } from './env';
 
 const parsePort = (value: string | undefined): number => {

@@ -1,3 +1,8 @@
+/* AI Assistance Disclosure:
+Scope: Implement rate limiting and add linting.
+Author Review: Validated for style and accuracy.
+*/
+
 import cors from 'cors';
 import type { Application, NextFunction, Request, Response, RequestHandler} from 'express';
 import express from 'express';

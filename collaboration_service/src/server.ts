@@ -1,3 +1,8 @@
+/* AI Assistance Disclosure:
+Scope: Implement server logic and graceful shutdown.
+Author Review: Validated for style and accuracy.
+*/
+
 import Redis from 'ioredis';
 
 import { buildApp } from './app';

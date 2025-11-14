@@ -1,3 +1,8 @@
+/* AI Assistance Disclosure:
+Scope: Implement HistoryClient.
+Author Review: Validated for style and accuracy.
+*/
+
 export type SessionAttemptPayload = {
   sessionId: string;
   matchId?: string | null;

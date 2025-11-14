@@ -1,3 +1,8 @@
+/* AI Assistance Disclosure:
+Scope: Debug Zod schemas to ensure consistency across services.
+Author Review: Validated for style and accuracy.
+*/
+
 import { z } from 'zod';
 
 export const SessionStatusSchema = z.enum(['pending', 'active', 'ended']);

@@ -1,3 +1,8 @@
+/* AI Assistance Disclosure:
+Scope: Implement RedisSessionRepository.
+Author Review: Validated for style and accuracy.
+*/
+
 import type { Redis } from 'ioredis';
 
 import type { SessionSnapshot } from '../types';

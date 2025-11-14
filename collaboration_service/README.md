@@ -68,3 +68,12 @@ Ensure Redis is running locally (`redis://localhost:6379`) or override via `.env
 WebSocket clients connect to `ws://<host>/collab/{sessionId}?token=<sessionJWT>` (or via `Authorization: Bearer`). The gateway verifies the token, updates presence, and attaches the socket to `session:{sessionId}` Yjs doc names (`session:<id>/state`, `session:<id>/lang/<language>`).
 
 See `src/services/sessionManager.ts` and `src/websocket/collaborationGateway.ts` for lifecycle details.
+
+### Service-Level (Collaboration) AI Disclosure
+AI Tools: GPT-5-Codex
+
+Summary: AI tools were used in generating boilerplate code based on author-designed architecture, author-designed API endpoints and services. It was also used for debugging purposes and providing error explanations, assisting in finding the root cause of the problems.
+
+Restricted Scope: No requirements work or design-related work was handed to AI tools.
+
+Validation: Any code that was generated was done incrementally, and validated for correctness and logic at every step.
