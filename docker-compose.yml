@@ -1,3 +1,8 @@
+# AI Assistance Disclosure:
+# Scope: Implementation of docker-compose for for development 
+# and production environments for all containerised services
+# Author Review: Validated for style and accuracy.
+
 version: '3.8'
 
 services:
