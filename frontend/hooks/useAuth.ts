@@ -1,4 +1,9 @@
-﻿'use client';
+﻿/* AI Assistance Disclosure:
+Scope: Debux isAuthenticated logic.
+Author Review: Validated for style and accuracy.
+*/
+
+'use client';
 
 import { useMemo } from 'react';
 

@@ -1,3 +1,8 @@
+/* AI Assistance Disclosure:
+Scope: Implement and debug page components, and standardize theme with globals. Also refactor to fit Docker environment.
+Author Review: Validated for style and accuracy.
+*/
+
 "use client";
 
 import { useCallback, useState } from 'react';

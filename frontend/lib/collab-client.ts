@@ -1,3 +1,8 @@
+/* AI Assistance Disclosure:
+Scope: Implement API client functions for lightweight wrapper to pass to pages.
+Author Review: Validated for style and accuracy.
+*/
+
 export type SessionParticipant = {
   userId: string;
   displayName?: string;

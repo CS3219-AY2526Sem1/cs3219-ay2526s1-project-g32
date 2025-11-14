@@ -51,3 +51,12 @@ npm run start --workspace frontend
 - `/admin` – Admin console (question CRUD + admin promotion)
 
 Global styles live in `app/globals.css`. Ant Design theming is provided via `app/providers.tsx`.
+
+### Service-Level (Frontend) AI Disclosure
+AI Tools: GPT-5-Codex, GitHub Copilot
+
+Summary: AI tools were used in generating boilerplate code based on author-designed architecture, author-designed API endpoints and services. It was also used for debugging purposes and providing error explanations, assisting in finding the root cause of the problems.
+
+Restricted Scope: No requirements work or design-related work was handed to AI tools.
+
+Validation: Any code that was generated was done incrementally, and validated for correctness and logic at every step.

@@ -1,4 +1,9 @@
-﻿'use client';
+﻿/* AI Assistance Disclosure:
+Scope: Implement and debug AuthContext functionality.
+Author Review: Validated for style and accuracy.
+*/
+
+'use client';
 
 import type { ReactNode } from 'react';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
