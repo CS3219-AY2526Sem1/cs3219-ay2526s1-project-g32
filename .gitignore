@@ -1,0 +1,11 @@
+node_modules
+.env
+.DS_Store
+user_service/dist/
+question_service/dist/
+collaboration_service/dist/
+matching_service/dist/
+frontend/.next/
+frontend/out/
+frontend/.env.local
+collaboration_service/docs/
